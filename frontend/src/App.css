@@ -228,3 +228,37 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+/* Personalized behavior analysis */
+
+.history-field {
+  grid-column: 1 / -1;
+}
+
+.history-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #152238;
+  font: inherit;
+  resize: vertical;
+}
+
+.history-field textarea:focus {
+  outline: 2px solid #4263eb;
+  outline-offset: 2px;
+}
+
+.behavior-result {
+  background: #f0fdf8;
+  border-color: #c6eee0;
+}
+
+@media (max-width: 800px) {
+  .history-field {
+    grid-column: auto;
+  }
+}

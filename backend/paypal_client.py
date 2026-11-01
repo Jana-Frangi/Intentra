@@ -30,7 +30,7 @@ PAYPAL_BASE_URL = "https://api-m.sandbox.paypal.com"
 
 
 def validate_sandbox_configuration():
-    """Prevent accidental use of live PayPal credentials."""
+    """Only allow PayPal Sandbox connections."""
 
     if PAYPAL_ENVIRONMENT != "sandbox":
         raise RuntimeError(
@@ -43,16 +43,22 @@ def validate_sandbox_configuration():
         )
 
 
+def validate_order_id(order_id: str):
+    """Validate the format of a PayPal order ID."""
+
+    if (
+        not isinstance(order_id, str)
+        or not re.fullmatch(r"[A-Za-z0-9]{10,30}", order_id)
+    ):
+        raise ValueError("Invalid PayPal order ID.")
+
+
 # --------------------------------------------------
 # PAYPAL AUTHENTICATION
 # --------------------------------------------------
 
 def get_sandbox_access_token() -> str:
-    """
-    Obtain a temporary PayPal Sandbox OAuth token.
-
-    Never print or expose the access token.
-    """
+    """Obtain a temporary PayPal Sandbox access token."""
 
     validate_sandbox_configuration()
 
@@ -91,17 +97,45 @@ def get_sandbox_access_token() -> str:
             "Could not connect to PayPal Sandbox."
         ) from None
 
-    except (KeyError, ValueError):
+    except (KeyError, ValueError, TypeError):
         raise RuntimeError(
-            "PayPal returned an invalid authentication response."
+            "Invalid PayPal authentication response."
         ) from None
 
 
 def check_paypal_connection() -> bool:
-    """Check whether Sandbox authentication succeeds."""
+    """Check whether Sandbox authentication works."""
 
-    token = get_sandbox_access_token()
-    return bool(token)
+    return bool(get_sandbox_access_token())
+
+
+# --------------------------------------------------
+# CAPTURE RESPONSE PARSING
+# --------------------------------------------------
+
+def extract_captures(order_data: dict) -> list[dict]:
+    """
+    Extract capture records from a PayPal order response.
+
+    Do not infer a successful capture from the order
+    status alone.
+    """
+
+    captures = []
+
+    for unit in order_data.get("purchase_units", []):
+        payments = unit.get("payments") or {}
+
+        for capture in payments.get("captures", []):
+            captures.append(
+                {
+                    "capture_id": capture.get("id"),
+                    "status": capture.get("status"),
+                    "amount": capture.get("amount"),
+                }
+            )
+
+    return captures
 
 
 # --------------------------------------------------
@@ -109,11 +143,7 @@ def check_paypal_connection() -> bool:
 # --------------------------------------------------
 
 def create_sandbox_order(amount: str = "10.00") -> dict:
-    """
-    Create a PayPal Sandbox order.
-
-    This does not approve or capture a payment.
-    """
+    """Create a PayPal Sandbox order without capturing it."""
 
     try:
         value = Decimal(amount)
@@ -175,9 +205,9 @@ def create_sandbox_order(amount: str = "10.00") -> dict:
             "Could not reach PayPal Sandbox."
         ) from None
 
-    except (KeyError, ValueError):
+    except (KeyError, ValueError, TypeError):
         raise RuntimeError(
-            "PayPal returned an invalid order response."
+            "Invalid PayPal order response."
         ) from None
 
 
@@ -187,13 +217,13 @@ def create_sandbox_order(amount: str = "10.00") -> dict:
 
 def get_sandbox_order_details(order_id: str) -> dict:
     """
-    Retrieve PayPal order details.
+    Read the current PayPal order status and any
+    returned capture records.
 
-    This operation is read-only.
+    This function never captures a payment.
     """
 
-    if not re.fullmatch(r"[A-Za-z0-9]{10,30}", order_id):
-        raise ValueError("Invalid PayPal order ID.")
+    validate_order_id(order_id)
 
     access_token = get_sandbox_access_token()
 
@@ -220,6 +250,7 @@ def get_sandbox_order_details(order_id: str) -> dict:
                 }
                 for unit in details.get("purchase_units", [])
             ],
+            "captures": extract_captures(details),
         }
 
     except HTTPError as error:
@@ -232,7 +263,7 @@ def get_sandbox_order_details(order_id: str) -> dict:
             "Could not reach PayPal Sandbox."
         ) from None
 
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, AttributeError):
         raise RuntimeError(
             "PayPal returned invalid order details."
         ) from None
@@ -244,21 +275,17 @@ def get_sandbox_order_details(order_id: str) -> dict:
 
 def capture_sandbox_order(order_id: str) -> dict:
     """
-    Capture a PayPal Sandbox order.
+    Capture a buyer-approved PayPal Sandbox order.
 
-    Only call after the buyer has approved the order
-    and the backend has completed its verification.
-
-    The same order always uses the same idempotency key.
+    Must only be called by the verified backend
+    workflow after all authorization checks pass.
     """
 
-    if not re.fullmatch(r"[A-Za-z0-9]{10,30}", order_id):
-        raise ValueError("Invalid PayPal order ID.")
+    validate_order_id(order_id)
 
     access_token = get_sandbox_access_token()
 
-    # Stable identifier for this specific order's capture.
-    # Do not generate a fresh UUID on every retry.
+    # Stable idempotency key for this order.
     capture_request_id = str(
         uuid.uuid5(
             uuid.NAMESPACE_URL,
@@ -285,25 +312,10 @@ def capture_sandbox_order(order_id: str) -> dict:
         with urlopen(request, timeout=15) as response:
             result = json.load(response)
 
-        captures = [
-            capture
-            for unit in result.get("purchase_units", [])
-            for capture in unit.get("payments", {}).get(
-                "captures", []
-            )
-        ]
-
         return {
             "order_id": result.get("id"),
             "status": result.get("status"),
-            "captures": [
-                {
-                    "capture_id": item.get("id"),
-                    "status": item.get("status"),
-                    "amount": item.get("amount"),
-                }
-                for item in captures
-            ],
+            "captures": extract_captures(result),
         }
 
     except HTTPError as error:
@@ -316,7 +328,7 @@ def capture_sandbox_order(order_id: str) -> dict:
             "Could not reach PayPal Sandbox."
         ) from None
 
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, AttributeError):
         raise RuntimeError(
             "PayPal returned an invalid capture response."
         ) from None

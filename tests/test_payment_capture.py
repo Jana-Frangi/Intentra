@@ -2,7 +2,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
@@ -70,7 +70,9 @@ class PaymentCaptureTests(unittest.TestCase):
 
     @patch("payment_capture.get_order")
     @patch("payment_capture.capture_sandbox_order")
-    def test_unknown_order_rejected(self, mock_capture, mock_get):
+    def test_unknown_order_rejected(
+        self, mock_capture, mock_get
+    ):
         mock_get.return_value = None
 
         with self.assertRaises(ValueError):
@@ -105,7 +107,9 @@ class PaymentCaptureTests(unittest.TestCase):
         mock_get.return_value = self.saved_order
         mock_verify.return_value = self.verification
         mock_reserve.return_value = True
-        mock_capture.side_effect = RuntimeError("Network failure")
+        mock_capture.side_effect = RuntimeError(
+            "Network failure"
+        )
 
         with self.assertRaisesRegex(
             RuntimeError, "Reconciliation required"
@@ -128,6 +132,7 @@ class PaymentCaptureTests(unittest.TestCase):
         mock_get.return_value = self.saved_order
         mock_verify.return_value = self.verification
         mock_reserve.return_value = True
+
         mock_capture.return_value = {
             **self.capture_result,
             "captures": [
@@ -139,6 +144,61 @@ class PaymentCaptureTests(unittest.TestCase):
                     },
                 }
             ],
+        }
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Reconciliation required"
+        ):
+            process_sandbox_capture(self.order_id)
+
+        mock_update.assert_called_once_with(
+            self.order_id, "RECONCILE"
+        )
+
+    @patch("payment_capture.update_order_status")
+    @patch("payment_capture.capture_sandbox_order")
+    @patch("payment_capture.reserve_order_for_capture")
+    @patch("payment_capture.verify_order_ready_for_capture")
+    @patch("payment_capture.get_order")
+    def test_multiple_captures_require_reconciliation(
+        self, mock_get, mock_verify, mock_reserve,
+        mock_capture, mock_update
+    ):
+        mock_get.return_value = self.saved_order
+        mock_verify.return_value = self.verification
+        mock_reserve.return_value = True
+
+        mock_capture.return_value = {
+            **self.capture_result,
+            "captures": self.capture_result["captures"] * 2,
+        }
+
+        with self.assertRaisesRegex(
+            RuntimeError, "Reconciliation required"
+        ):
+            process_sandbox_capture(self.order_id)
+
+        mock_update.assert_called_once_with(
+            self.order_id, "RECONCILE"
+        )
+
+    @patch("payment_capture.update_order_status")
+    @patch("payment_capture.capture_sandbox_order")
+    @patch("payment_capture.reserve_order_for_capture")
+    @patch("payment_capture.verify_order_ready_for_capture")
+    @patch("payment_capture.get_order")
+    def test_malformed_capture_requires_reconciliation(
+        self, mock_get, mock_verify, mock_reserve,
+        mock_capture, mock_update
+    ):
+        mock_get.return_value = self.saved_order
+        mock_verify.return_value = self.verification
+        mock_reserve.return_value = True
+
+        mock_capture.return_value = {
+            "order_id": self.order_id,
+            "status": "COMPLETED",
+            "captures": None,
         }
 
         with self.assertRaisesRegex(

@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import PayPalCheckout from './PayPalCheckout'
 import './App.css'
 
 type RiskResult = {
@@ -60,15 +61,19 @@ function App() {
       const currentAmount = amount.trim()
       const recentCount = recentTransactions.trim()
 
-      if (!/^\d+(\.\d{1,2})?$/.test(currentAmount) ||
-          Number(currentAmount) <= 0) {
+      if (
+        !/^\d+(\.\d{1,2})?$/.test(currentAmount) ||
+        Number(currentAmount) <= 0
+      ) {
         throw new Error(
           'Enter a positive payment amount with up to two decimal places.'
         )
       }
 
-      if (!/^\d+$/.test(recentCount) ||
-          !Number.isSafeInteger(Number(recentCount))) {
+      if (
+        !/^\d+$/.test(recentCount) ||
+        !Number.isSafeInteger(Number(recentCount))
+      ) {
         throw new Error(
           'Enter a valid non-negative whole number of transactions.'
         )
@@ -78,15 +83,19 @@ function App() {
         .split(',')
         .map((value) => value.trim())
 
-      if (history.some((value) =>
-        !/^\d+(\.\d{1,2})?$/.test(value) || Number(value) <= 0
-      )) {
+      if (
+        history.some(
+          (value) =>
+            !/^\d+(\.\d{1,2})?$/.test(value) ||
+            Number(value) <= 0
+        )
+      ) {
         throw new Error(
           'Enter positive historical amounts separated by commas.'
         )
       }
 
-      // First: analyze fixed transaction risk.
+      // Analyze transaction risk.
       const riskResponse = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
@@ -105,20 +114,25 @@ function App() {
       const riskData: RiskResult = await riskResponse.json()
       setRiskResult(riskData)
 
-      // Second: compare with previous transaction amounts.
-      const behaviorResponse = await fetch('/api/analyze-behavior', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: currentAmount,
-          historical_amounts: history,
-        }),
-      })
+      // Compare the transaction against historical activity.
+      const behaviorResponse = await fetch(
+        '/api/analyze-behavior',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: currentAmount,
+            historical_amounts: history,
+          }),
+        }
+      )
 
       if (!behaviorResponse.ok) {
-        throw new Error('Unable to analyze transaction history.')
+        throw new Error(
+          'Unable to analyze transaction history.'
+        )
       }
 
       const behaviorData: BehaviorResult =
@@ -152,12 +166,15 @@ function App() {
           <h1>
             Understand your payment.
             <br />
-            <span>Make your next move with confidence.</span>
+            <span>
+              Make your next move with confidence.
+            </span>
           </h1>
 
           <p>
-            A smarter way to review payment costs, spot potential
-            risks, and understand transaction details before paying.
+            A smarter way to review payment costs,
+            spot potential risks, and understand transaction
+            details before paying.
           </p>
 
           <a className="primary-button" href="#analyze">
@@ -169,7 +186,9 @@ function App() {
           <div className="feature-card">
             <div className="feature-number">01</div>
             <h3>Payment transparency</h3>
-            <p>Understand fees and estimated payment costs.</p>
+            <p>
+              Understand fees and estimated payment costs.
+            </p>
           </div>
 
           <div className="feature-card">
@@ -185,13 +204,16 @@ function App() {
             <div className="feature-number">03</div>
             <h3>Payment confidence</h3>
             <p>
-              Review important conditions before confirming a payment.
+              Review important conditions before confirming
+              a payment.
             </p>
           </div>
         </section>
 
         <section className="analysis-section" id="analyze">
-          <div className="eyebrow">PAYMENT RISK ANALYSIS</div>
+          <div className="eyebrow">
+            PAYMENT RISK ANALYSIS
+          </div>
 
           <h2>Analyze a payment</h2>
 
@@ -200,14 +222,19 @@ function App() {
             against synthetic historical activity.
           </p>
 
-          <form className="analysis-form" onSubmit={handleAnalyze}>
+          <form
+            className="analysis-form"
+            onSubmit={handleAnalyze}
+          >
             <label>
               Payment amount
               <input
                 type="text"
                 inputMode="decimal"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onChange={(event) =>
+                  setAmount(event.target.value)
+                }
                 placeholder="1200.00"
                 required
               />
@@ -232,7 +259,9 @@ function App() {
               className="primary-button"
               disabled={isAnalyzing}
             >
-              {isAnalyzing ? 'Analyzing...' : 'Analyze payment'}
+              {isAnalyzing
+                ? 'Analyzing...'
+                : 'Analyze payment'}
             </button>
 
             <label className="history-field">
@@ -260,12 +289,16 @@ function App() {
 
               <p>
                 Risk score:{' '}
-                <strong>{riskResult.risk_score}/100</strong>
+                <strong>
+                  {riskResult.risk_score}/100
+                </strong>
               </p>
 
               <p>
                 Risk level:{' '}
-                <strong>{riskResult.risk_level.toUpperCase()}</strong>
+                <strong>
+                  {riskResult.risk_level.toUpperCase()}
+                </strong>
               </p>
 
               <h4>Detected signals</h4>
@@ -277,7 +310,9 @@ function App() {
                   ))}
                 </ul>
               ) : (
-                <p>No predefined risk signals detected.</p>
+                <p>
+                  No predefined risk signals detected.
+                </p>
               )}
 
               <p className="disclaimer">
@@ -302,7 +337,7 @@ function App() {
                   <p>
                     Payment-to-median ratio:{' '}
                     <strong>
-                      {behaviorResult.amount_ratio}×
+                      {behaviorResult.amount_ratio}x
                     </strong>
                   </p>
 
@@ -316,22 +351,30 @@ function App() {
                   </p>
                 </>
               ) : (
-                <p>Insufficient transaction history.</p>
+                <p>
+                  Insufficient transaction history.
+                </p>
               )}
 
               <p>{behaviorResult.message}</p>
 
               <p className="disclaimer">
-                Based on illustrative transaction history and
-                experimental thresholds. This does not establish fraud.
+                Based on illustrative transaction history
+                and experimental thresholds.
+                This does not establish fraud.
               </p>
             </div>
           )}
         </section>
+
+        {/* PayPal Checkout integration */}
+        <div id="checkout">
+          <PayPalCheckout />
+        </div>
       </main>
 
       <footer>
-        Intentra · Hackathon prototype · No real payments
+        Intentra | Hackathon prototype | Sandbox only
       </footer>
     </div>
   )

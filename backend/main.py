@@ -6,8 +6,12 @@ from pydantic import BaseModel, Field
 
 from behavior_engine import analyze_behavior
 from risk_engine import analyze_transaction
-from paypal_client import create_sandbox_order, capture_sandbox_order
+from paypal_client import create_sandbox_order
 from payment_store import save_order
+from checkout_sessions import (
+    create_checkout_session,
+    verify_checkout_session,
+)
 
 
 app = FastAPI(
@@ -55,6 +59,11 @@ class PayPalCaptureRequest(BaseModel):
     order_id: str = Field(
         ...,
         description="ID of a buyer-approved PayPal Sandbox order",
+    )
+    session_token: str = Field(
+        ...,
+        min_length=1,
+        description="Temporary checkout authorization token",
     )
 
 
@@ -118,7 +127,7 @@ def analyze_payment_behavior(request: BehaviorRequest):
 
 
 # --------------------------------------------------
-# PAYPAL SANDBOX — CREATE ORDER
+# PAYPAL SANDBOX - CREATE ORDER
 # --------------------------------------------------
 
 @app.post("/paypal/create-order")
@@ -132,23 +141,31 @@ def create_paypal_order(request: PayPalOrderRequest):
         ):
             raise ValueError("Invalid demo amount.")
 
-        # Create an order in PayPal Sandbox.
+    except (ValueError, InvalidOperation, TypeError):
+        raise HTTPException(
+            status_code=422,
+            detail="This demo only supports a EUR 10.00 payment.",
+        ) from None
+
+    try:
+        # Create a PayPal Sandbox order.
         order = create_sandbox_order("10.00")
 
-        # Store the order in our local SQLite database.
+        # Store the order in SQLite.
         save_order(
             order_id=order["order_id"],
             amount="10.00",
             currency="EUR",
         )
 
-        return order
+        # Associate the order with a temporary checkout token.
+        token = create_checkout_session(order["order_id"])
 
-    except (ValueError, InvalidOperation):
-        raise HTTPException(
-            status_code=422,
-            detail="This demo only supports a EUR 10.00 payment.",
-        ) from None
+        return {
+            "order_id": order["order_id"],
+            "status": order["status"],
+            "session_token": token,
+        }
 
     except RuntimeError:
         raise HTTPException(
@@ -156,15 +173,31 @@ def create_paypal_order(request: PayPalOrderRequest):
             detail="PayPal Sandbox order creation failed.",
         ) from None
 
+    except (ValueError, KeyError):
+        raise HTTPException(
+            status_code=502,
+            detail="Invalid PayPal Sandbox order response.",
+        ) from None
+
 
 # --------------------------------------------------
-# PAYPAL SANDBOX — CAPTURE ORDER
+# PAYPAL SANDBOX - CAPTURE ORDER
 # --------------------------------------------------
 
 @app.post("/paypal/capture-order")
 def capture_paypal_order(request: PayPalCaptureRequest):
-    # This route is not enabled until server-side
-    # order verification and replay protection are ready.
+    # Verify checkout ownership before processing.
+    if not verify_checkout_session(
+        request.order_id,
+        request.session_token,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid or expired checkout session.",
+        )
+
+    # Capture stays disabled until the remaining
+    # integration and reconciliation tests are complete.
     raise HTTPException(
         status_code=503,
         detail="Sandbox capture is not enabled yet.",

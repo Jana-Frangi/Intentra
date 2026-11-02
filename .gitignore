@@ -21,3 +21,13 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Machine learning datasets
+/data/
+
+# Generated machine learning models
+/ml/*.joblib
+/ml/*.pkl
+
+# Generated ML experiment reports
+/ml/model_*_metrics.json

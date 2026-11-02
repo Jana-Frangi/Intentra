@@ -210,6 +210,40 @@ class PaymentCaptureTests(unittest.TestCase):
             self.order_id, "RECONCILE"
         )
 
+    @patch("payment_capture.update_order_status")
+    @patch("payment_capture.capture_sandbox_order")
+    @patch("payment_capture.reserve_order_for_capture")
+    @patch("payment_capture.verify_order_ready_for_capture")
+    @patch("payment_capture.get_order")
+    def test_database_failure_after_capture(
+        self, mock_get, mock_verify, mock_reserve,
+        mock_capture, mock_update
+    ):
+        mock_get.return_value = self.saved_order
+        mock_verify.return_value = self.verification
+        mock_reserve.return_value = True
+        mock_capture.return_value = self.capture_result
+
+        # Simulate SQLite failing to record COMPLETED.
+        mock_update.side_effect = RuntimeError(
+            "Database unavailable"
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Reconciliation required"
+        ):
+            process_sandbox_capture(self.order_id)
+
+        # The PayPal capture must be attempted only once.
+        mock_capture.assert_called_once_with(self.order_id)
+
+        # The application attempted to save completion.
+        mock_update.assert_called_once_with(
+            self.order_id,
+            "COMPLETED"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

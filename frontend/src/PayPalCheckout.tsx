@@ -7,8 +7,8 @@ import {
 
 const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID
 
-// Keep disabled until the backend capture workflow
-// and reconciliation safeguards have been tested.
+// SAFETY SWITCH:
+// Keep false until backend capture is ready.
 const CHECKOUT_ENABLED = false
 
 type CreatedOrder = {
@@ -29,8 +29,7 @@ export default function PayPalCheckout() {
   const [message, setMessage] = useState('')
   const [paymentComplete, setPaymentComplete] = useState(false)
 
-  // Keep the checkout authorization token in memory.
-  // Never store it in localStorage or print it.
+  // Store the temporary checkout token in memory only.
   const checkoutSession = useRef<{
     orderId: string
     token: string
@@ -38,9 +37,15 @@ export default function PayPalCheckout() {
 
   if (!clientId) {
     return (
-      <p className="analysis-error">
-        PayPal Sandbox Client ID is missing.
-      </p>
+      <section className="analysis-section">
+        <div className="eyebrow">PAYPAL SANDBOX</div>
+
+        <h2>Test a PayPal payment</h2>
+
+        <p className="analysis-error">
+          PayPal Sandbox Client ID is missing.
+        </p>
+      </section>
     )
   }
 
@@ -51,15 +56,43 @@ export default function PayPalCheckout() {
       <h2>Test a PayPal payment</h2>
 
       <p>
-        Our demo uses a simulated EUR 10.00 payment
-        through PayPal Sandbox. No real money is transferred.
+        Preview a EUR 10.00 payment through PayPal Sandbox.
+        No real money is transferred.
       </p>
 
       {!CHECKOUT_ENABLED && (
-        <p role="status">
-          PayPal Checkout is being prepared.
-          Payment capture is not enabled yet.
-        </p>
+        <div style={{ maxWidth: '450px', marginTop: '20px' }}>
+          <p style={{ marginBottom: '16px' }}>
+            PayPal Sandbox preview — payment disabled.
+          </p>
+
+          <PayPalProvider
+            clientId={clientId}
+            environment="sandbox"
+            components={['paypal-payments']}
+            pageType="checkout"
+          >
+            <PayPalOneTimePaymentButton
+              disabled={true}
+              presentationMode="auto"
+              createOrder={async () => {
+                throw new Error(
+                  'Checkout is disabled in preview mode.'
+                )
+              }}
+              onApprove={async () => {
+                throw new Error(
+                  'Payment capture is disabled.'
+                )
+              }}
+              onError={() => {
+                setMessage(
+                  'PayPal preview encountered an error.'
+                )
+              }}
+            />
+          </PayPalProvider>
+        </div>
       )}
 
       {CHECKOUT_ENABLED && (
@@ -134,6 +167,7 @@ export default function PayPalCheckout() {
                       'Checkout authorization is missing. ' +
                       'Please start a new checkout.'
                     )
+
                     throw new Error(
                       'Checkout session mismatch.'
                     )
@@ -199,6 +233,7 @@ export default function PayPalCheckout() {
                 }}
                 onCancel={() => {
                   checkoutSession.current = null
+
                   setMessage(
                     'Checkout cancelled. ' +
                     'No payment was confirmed.'
@@ -217,7 +252,10 @@ export default function PayPalCheckout() {
       )}
 
       {message && (
-        <p role="status" style={{ marginTop: '20px' }}>
+        <p
+          role="status"
+          style={{ marginTop: '20px' }}
+        >
           {message}
         </p>
       )}

@@ -88,5 +88,26 @@ def reserve_order_for_capture(order_id: str) -> bool:
 
             return cursor.rowcount == 1
 
+def mark_interrupted_captures_for_reconciliation() -> int:
+    """
+    Mark potentially interrupted capture attempts
+    for investigation.
+
+    Never starts or retries a PayPal payment.
+    """
+    with closing(
+        sqlite3.connect(DB_PATH, timeout=10)
+    ) as connection:
+        with connection:
+            cursor = connection.execute(
+                """
+                UPDATE paypal_orders
+                SET status = 'RECONCILE'
+                WHERE status = 'CAPTURING'
+                """
+            )
+
+            return cursor.rowcount
+
 
 initialize_payment_store()

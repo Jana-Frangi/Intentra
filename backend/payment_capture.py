@@ -180,11 +180,25 @@ def process_sandbox_capture(order_id: str) -> dict:
             "Capture outcome uncertain. Reconciliation required."
         ) from None
 
+
     # --------------------------------------------------
     # 5. RECORD CONFIRMED COMPLETION
     # --------------------------------------------------
 
-    update_order_status(order_id, "COMPLETED")
+    try:
+        update_order_status(order_id, "COMPLETED")
+
+    except Exception:
+        # PayPal has already confirmed the capture,
+        # but Intentra could not record completion.
+        #
+        # The order remains reserved as CAPTURING.
+        # Do not retry the PayPal capture.
+
+        raise RuntimeError(
+            "PayPal capture succeeded, but local recording failed. "
+            "Reconciliation required."
+        ) from None
 
     return {
         "order_id": order_id,

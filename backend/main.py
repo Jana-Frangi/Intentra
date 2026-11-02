@@ -1,9 +1,7 @@
 
 from decimal import Decimal, InvalidOperation
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-
 from behavior_engine import analyze_behavior
 from risk_engine import analyze_transaction
 from paypal_client import create_sandbox_order
@@ -15,6 +13,7 @@ from checkout_sessions import (
 from payment_capture import process_sandbox_capture
 from payment_capture import process_sandbox_capture
 from ml_predictor import predict_transaction
+from behavioral_intelligence import analyze_customer_behavior
 
 # --------------------------------------------------
 # PAYMENT CAPTURE FEATURE FLAG
@@ -296,4 +295,31 @@ def predict_ml_risk(request: MLPredictionRequest):
         raise HTTPException(
             status_code=503,
             detail="Machine-learning model is unavailable.",
+        ) from None
+
+# --------------------------------------------------
+# INTENTRA - CUSTOMER BEHAVIORAL INTELLIGENCE
+# --------------------------------------------------
+
+class BehavioralAnalysisRequest(BaseModel):
+    customer_id: int
+    amount: float
+    merchant_id: str
+    transaction_time: str
+
+
+@app.post("/behavior/analyze-history")
+def analyze_transaction_history(request: BehavioralAnalysisRequest):
+    try:
+        return analyze_customer_behavior(
+            customer_id=request.customer_id,
+            amount=request.amount,
+            merchant_id=request.merchant_id,
+            transaction_time=request.transaction_time,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
         ) from None

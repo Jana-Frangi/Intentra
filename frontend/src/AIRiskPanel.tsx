@@ -21,25 +21,27 @@ export default function AIRiskPanel() {
     useState<Prediction | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showTechnical, setShowTechnical] = useState(false)
 
   async function analyzeTransaction() {
     setLoading(true)
     setError('')
     setPrediction(null)
+    setShowTechnical(false)
 
     const numericAmount = Number(amount)
     const numericBalance = Number(balance)
 
     if (
+      amount.trim() === '' ||
+      balance.trim() === '' ||
       !Number.isFinite(numericAmount) ||
       !Number.isFinite(numericBalance) ||
       numericAmount <= 0 ||
-      numericBalance < 0 ||
-      amount.trim() === '' ||
-      balance.trim() === ''
+      numericBalance < 0
     ) {
       setError(
-        'Enter a positive amount and a nonnegative balance.'
+        'Enter a valid payment amount and starting balance.'
       )
       setLoading(false)
       return
@@ -51,6 +53,7 @@ export default function AIRiskPanel() {
         headers: {
           'Content-Type': 'application/json',
         },
+        cache: 'no-store',
         body: JSON.stringify({
           transaction_type: transactionType,
           amount: numericAmount,
@@ -59,41 +62,59 @@ export default function AIRiskPanel() {
       })
 
       if (!response.ok) {
-        throw new Error('AI prediction request failed.')
+        throw new Error('Prediction request failed.')
       }
 
       const result: Prediction = await response.json()
+
+      if (
+        typeof result.flagged_for_review !== 'boolean' ||
+        !Number.isFinite(result.model_score) ||
+        !Number.isFinite(result.decision_threshold)
+      ) {
+        throw new Error('Invalid prediction response.')
+      }
+
       setPrediction(result)
     } catch {
       setError(
-        'Unable to obtain the AI prediction. ' +
-        'Check that the backend is running.'
+        'We could not complete the safety check. ' +
+        'Please try again when the service is available.'
       )
     } finally {
       setLoading(false)
     }
   }
 
+  const amountLabel = Number(amount).toLocaleString(
+    'en-IE',
+    {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }
+  )
+
   return (
     <section className="analysis-section">
-      <div className="eyebrow">INTENTRA AI</div>
-      <h2>AI Transaction Intelligence</h2>
+      <div className="eyebrow">INTENTRA PROTECT</div>
+
+      <h2>Payment Safety Check</h2>
 
       <p>
-        Explore how our trained machine-learning model
-        evaluates transaction patterns using PaySim data.
+        Check a sample transaction for patterns that
+        may deserve additional attention.
       </p>
 
       <div
         style={{
           display: 'grid',
           gap: '16px',
-          maxWidth: '440px',
+          maxWidth: '480px',
           marginTop: '24px',
         }}
       >
         <label>
-          Transaction type
+          Payment type
           <select
             value={transactionType}
             onChange={(event) =>
@@ -109,7 +130,7 @@ export default function AIRiskPanel() {
         </label>
 
         <label>
-          Transaction amount
+          Payment amount (demo units)
           <input
             type="number"
             min="0.01"
@@ -122,7 +143,7 @@ export default function AIRiskPanel() {
         </label>
 
         <label>
-          Sender balance before transaction
+          Available balance before payment (demo units)
           <input
             type="number"
             min="0"
@@ -136,10 +157,12 @@ export default function AIRiskPanel() {
 
         <button
           type="button"
-          onClick={analyzeTransaction}
           disabled={loading}
+          onClick={analyzeTransaction}
         >
-          {loading ? 'Analyzing...' : 'Analyze with AI'}
+          {loading
+            ? 'Checking transaction...'
+            : 'Check payment safety'}
         </button>
       </div>
 
@@ -153,43 +176,101 @@ export default function AIRiskPanel() {
         <div
           className="analysis-result"
           style={{
-            maxWidth: '440px',
-            marginTop: '24px',
+            maxWidth: '520px',
+            marginTop: '26px',
+            padding: '24px',
           }}
         >
+          <div className="eyebrow">
+            PAYMENT SAFETY RESULT
+          </div>
+
           <h3>
             {prediction.flagged_for_review
-              ? 'Additional review recommended'
-              : 'No model alert triggered'}
+              ? 'Extra verification recommended'
+              : 'No additional model alert'}
           </h3>
 
-          <p>
-            Model score:{' '}
-            <strong>
-              {prediction.model_score.toFixed(4)}
-            </strong>
+          <p style={{ fontSize: '26px', fontWeight: 700 }}>
+            {amountLabel} demo units
           </p>
 
           <p>
-            Review threshold:{' '}
-            <strong>
-              {prediction.decision_threshold.toFixed(4)}
-            </strong>
+            {prediction.flagged_for_review
+              ? (
+                'This transaction matches a pattern ' +
+                'flagged by our experimental screening model. ' +
+                'It may deserve additional review.'
+              )
+              : (
+                'The experimental screening model did not ' +
+                'flag this transaction at its current threshold. ' +
+                'This does not guarantee the payment is safe.'
+              )}
           </p>
 
-          <p>
-            Model version:{' '}
-            <strong>{prediction.model_version}</strong>
+          <div style={{ marginTop: '20px' }}>
+            <h4>Before proceeding</h4>
+
+            <ul>
+              <li>
+                Confirm you recognize the recipient.
+              </li>
+              <li>
+                Double-check the payment amount.
+              </li>
+              <li>
+                Be cautious of unexpected or urgent requests.
+              </li>
+              {prediction.flagged_for_review && (
+                <li>
+                  Consider additional verification before paying.
+                </li>
+              )}
+            </ul>
+          </div>
+
+          <p style={{ marginTop: '20px' }}>
+            <small>
+              This is experimental screening based on
+              synthetic transaction data. It does not
+              determine whether a payment is fraudulent
+              and does not automatically block payments.
+            </small>
           </p>
 
-          <p>
-            Dataset:{' '}
-            <strong>{prediction.dataset}</strong>
-          </p>
+          <details
+            open={showTechnical}
+            onToggle={(event) =>
+              setShowTechnical(event.currentTarget.open)
+            }
+            style={{ marginTop: '20px' }}
+          >
+            <summary style={{ cursor: 'pointer' }}>
+              Technical details (analyst view)
+            </summary>
 
-          <p>
-            <small>{prediction.warning}</small>
-          </p>
+            <div style={{ marginTop: '12px' }}>
+              <p>
+                Model version: {prediction.model_version}
+              </p>
+              <p>
+                Model score:{' '}
+                {prediction.model_score.toFixed(6)}
+              </p>
+              <p>
+                Review threshold:{' '}
+                {prediction.decision_threshold.toFixed(6)}
+              </p>
+              <p>
+                Training dataset: {prediction.dataset}
+              </p>
+              <p>
+                Scores calibrated:{' '}
+                {prediction.score_calibrated ? 'Yes' : 'No'}
+              </p>
+            </div>
+          </details>
         </div>
       )}
     </section>

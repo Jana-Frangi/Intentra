@@ -7,9 +7,9 @@ import {
 
 const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID
 
-// SAFETY SWITCH:
-// Keep false until backend capture is ready.
-const CHECKOUT_ENABLED = false
+// Approval-only test mode.
+// No payment capture is allowed in this component.
+const APPROVAL_TEST_ENABLED = true
 
 type CreatedOrder = {
   order_id: string
@@ -17,19 +17,11 @@ type CreatedOrder = {
   session_token: string
 }
 
-type CaptureResult = {
-  order_id: string
-  status: string
-  capture_id: string
-  amount: string
-  currency: string
-}
-
 export default function PayPalCheckout() {
   const [message, setMessage] = useState('')
-  const [paymentComplete, setPaymentComplete] = useState(false)
+  const [approved, setApproved] = useState(false)
+  const [approvedOrderId, setApprovedOrderId] = useState('')
 
-  // Store the temporary checkout token in memory only.
   const checkoutSession = useRef<{
     orderId: string
     token: string
@@ -39,9 +31,7 @@ export default function PayPalCheckout() {
     return (
       <section className="analysis-section">
         <div className="eyebrow">PAYPAL SANDBOX</div>
-
         <h2>Test a PayPal payment</h2>
-
         <p className="analysis-error">
           PayPal Sandbox Client ID is missing.
         </p>
@@ -53,212 +43,144 @@ export default function PayPalCheckout() {
     <section className="analysis-section">
       <div className="eyebrow">PAYPAL SANDBOX</div>
 
-      <h2>Test a PayPal payment</h2>
+      <h2>PayPal checkout test</h2>
 
       <p>
-        Preview a EUR 10.00 payment through PayPal Sandbox.
-        No real money is transferred.
+        Test buyer approval for an EUR 10.00
+        PayPal Sandbox order.
       </p>
 
-      {!CHECKOUT_ENABLED && (
-        <div style={{ maxWidth: '450px', marginTop: '20px' }}>
-          <p style={{ marginBottom: '16px' }}>
-            PayPal Sandbox preview — payment disabled.
-          </p>
+      <p role="status">
+        Approval-only mode. Payment capture is disabled.
+        Approval does not mean the payment was completed.
+      </p>
 
-          <PayPalProvider
-            clientId={clientId}
-            environment="sandbox"
-            components={['paypal-payments']}
-            pageType="checkout"
-          >
+      <div style={{ maxWidth: '450px', marginTop: '25px' }}>
+        <PayPalProvider
+          clientId={clientId}
+          environment="sandbox"
+          components={['paypal-payments']}
+          pageType="checkout"
+        >
+          {!approved && (
             <PayPalOneTimePaymentButton
-              disabled={true}
+              disabled={!APPROVAL_TEST_ENABLED}
               presentationMode="auto"
               createOrder={async () => {
-                throw new Error(
-                  'Checkout is disabled in preview mode.'
+                checkoutSession.current = null
+                setMessage('Creating Sandbox order...')
+
+                const response = await fetch(
+                  '/api/paypal/create-order',
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    cache: 'no-store',
+                    body: JSON.stringify({
+                      amount: '10.00',
+                    }),
+                  }
                 )
+
+                if (!response.ok) {
+                  setMessage('Order creation failed.')
+                  throw new Error('Order creation failed.')
+                }
+
+                const order: CreatedOrder =
+                  await response.json()
+
+                if (
+                  !order.order_id ||
+                  order.status !== 'CREATED' ||
+                  !order.session_token
+                ) {
+                  setMessage('Invalid order response.')
+                  throw new Error('Invalid order response.')
+                }
+
+                checkoutSession.current = {
+                  orderId: order.order_id,
+                  token: order.session_token,
+                }
+
+                setMessage(
+                  'Sign in with your Sandbox buyer account.'
+                )
+
+                return {
+                  orderId: order.order_id,
+                }
               }}
-              onApprove={async () => {
-                throw new Error(
-                  'Payment capture is disabled.'
+              onApprove={async ({ orderId }) => {
+                const session = checkoutSession.current
+
+                if (
+                  !session ||
+                  session.orderId !== orderId
+                ) {
+                  setMessage(
+                    'Approval received, but the checkout ' +
+                    'session could not be verified.'
+                  )
+                  throw new Error(
+                    'Checkout session mismatch.'
+                  )
+                }
+
+                setApprovedOrderId(orderId)
+                setApproved(true)
+
+                setMessage(
+                  'Buyer approval received. ' +
+                  'Payment has NOT been captured.'
+                )
+
+                // Intentionally no capture request.
+              }}
+              onCancel={() => {
+                checkoutSession.current = null
+                setMessage(
+                  'Checkout cancelled. ' +
+                  'No payment was captured.'
                 )
               }}
               onError={() => {
                 setMessage(
-                  'PayPal preview encountered an error.'
+                  'PayPal checkout encountered an error. ' +
+                  'No capture request was sent by Intentra.'
                 )
               }}
             />
-          </PayPalProvider>
-        </div>
-      )}
+          )}
+        </PayPalProvider>
 
-      {CHECKOUT_ENABLED && (
-        <div style={{ maxWidth: '450px', marginTop: '25px' }}>
-          <PayPalProvider
-            clientId={clientId}
-            environment="sandbox"
-            components={['paypal-payments']}
-            pageType="checkout"
-          >
-            {!paymentComplete && (
-              <PayPalOneTimePaymentButton
-                presentationMode="auto"
-                createOrder={async () => {
-                  checkoutSession.current = null
-                  setMessage('Creating Sandbox order...')
+        {approved && (
+          <div className="analysis-result">
+            <h3>Sandbox buyer approval received</h3>
 
-                  const response = await fetch(
-                    '/api/paypal/create-order',
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      cache: 'no-store',
-                      body: JSON.stringify({
-                        amount: '10.00',
-                      }),
-                    }
-                  )
+            <p>
+              Order ID: <strong>{approvedOrderId}</strong>
+            </p>
 
-                  if (!response.ok) {
-                    throw new Error(
-                      'Failed to create PayPal order.'
-                    )
-                  }
+            <p>
+              Payment status: <strong>NOT CAPTURED</strong>
+            </p>
 
-                  const order: CreatedOrder =
-                    await response.json()
+            <p>
+              Intentra has not requested payment capture.
+            </p>
+          </div>
+        )}
 
-                  if (
-                    !order.order_id ||
-                    order.status !== 'CREATED' ||
-                    !order.session_token
-                  ) {
-                    throw new Error(
-                      'Invalid checkout response.'
-                    )
-                  }
-
-                  checkoutSession.current = {
-                    orderId: order.order_id,
-                    token: order.session_token,
-                  }
-
-                  setMessage(
-                    'Complete the test checkout with PayPal.'
-                  )
-
-                  return {
-                    orderId: order.order_id,
-                  }
-                }}
-                onApprove={async ({ orderId }) => {
-                  const session = checkoutSession.current
-
-                  if (
-                    !session ||
-                    session.orderId !== orderId
-                  ) {
-                    setMessage(
-                      'Checkout authorization is missing. ' +
-                      'Please start a new checkout.'
-                    )
-
-                    throw new Error(
-                      'Checkout session mismatch.'
-                    )
-                  }
-
-                  setMessage(
-                    'Verifying Sandbox payment...'
-                  )
-
-                  const response = await fetch(
-                    '/api/paypal/capture-order',
-                    {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      cache: 'no-store',
-                      body: JSON.stringify({
-                        order_id: orderId,
-                        session_token: session.token,
-                      }),
-                    }
-                  )
-
-                  if (!response.ok) {
-                    setMessage(
-                      'Payment could not be confirmed. ' +
-                      'Please check its status before retrying.'
-                    )
-
-                    throw new Error(
-                      'Payment confirmation unavailable.'
-                    )
-                  }
-
-                  const result: CaptureResult =
-                    await response.json()
-
-                  const validResult =
-                    result.order_id === orderId &&
-                    result.status === 'COMPLETED' &&
-                    Boolean(result.capture_id) &&
-                    result.currency === 'EUR' &&
-                    result.amount === '10.00'
-
-                  if (!validResult) {
-                    setMessage(
-                      'Unexpected payment result. ' +
-                      'Please verify the order status.'
-                    )
-
-                    throw new Error(
-                      'Unexpected payment result.'
-                    )
-                  }
-
-                  checkoutSession.current = null
-                  setPaymentComplete(true)
-
-                  setMessage(
-                    'EUR 10.00 Sandbox payment completed!'
-                  )
-                }}
-                onCancel={() => {
-                  checkoutSession.current = null
-
-                  setMessage(
-                    'Checkout cancelled. ' +
-                    'No payment was confirmed.'
-                  )
-                }}
-                onError={() => {
-                  setMessage(
-                    'PayPal Checkout encountered an error. ' +
-                    'Please verify the payment status.'
-                  )
-                }}
-              />
-            )}
-          </PayPalProvider>
-        </div>
-      )}
-
-      {message && (
-        <p
-          role="status"
-          style={{ marginTop: '20px' }}
-        >
-          {message}
-        </p>
-      )}
+        {message && (
+          <p role="status" style={{ marginTop: '20px' }}>
+            {message}
+          </p>
+        )}
+      </div>
     </section>
   )
 }

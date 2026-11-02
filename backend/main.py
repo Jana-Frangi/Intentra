@@ -14,6 +14,7 @@ from checkout_sessions import (
 )
 from payment_capture import process_sandbox_capture
 from payment_capture import process_sandbox_capture
+from ml_predictor import predict_transaction
 
 # --------------------------------------------------
 # PAYMENT CAPTURE FEATURE FLAG
@@ -266,3 +267,33 @@ def check_paypal_order_status(request: PayPalCaptureRequest):
         "amount": order["expected_amount"],
         "currency": order["currency"],
     }
+# --------------------------------------------------
+# INTENTRA AI - MACHINE LEARNING PREDICTION
+# --------------------------------------------------
+
+class MLPredictionRequest(BaseModel):
+    transaction_type: str
+    amount: float
+    old_balance: float
+
+
+@app.post("/ml/predict")
+def predict_ml_risk(request: MLPredictionRequest):
+    try:
+        return predict_transaction(
+            transaction_type=request.transaction_type,
+            amount=request.amount,
+            old_balance=request.old_balance,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from None
+
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="Machine-learning model is unavailable.",
+        ) from None

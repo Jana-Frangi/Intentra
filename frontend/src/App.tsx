@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import PayPalCheckout from './PayPalCheckout'
 import './App.css'
+import AIRiskPanel from './AIRiskPanel'
 
 type RiskResult = {
   amount: string
@@ -369,6 +370,7 @@ function App() {
 
         {/* PayPal Checkout integration */}
         <div id="checkout">
+          <AIRiskPanel />
           <PayPalCheckout />
         </div>
       </main>

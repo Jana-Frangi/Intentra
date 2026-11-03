@@ -578,7 +578,9 @@ function App() {
               </div>
 
               <div className="workspace-card protect-card">
-                <AIRiskPanel />
+                <AIRiskPanel
+  onOpenCheckout={() => navigateTo('checkout')}
+/>
                 <CustomerHistoryPanel />
               </div>
             </section>

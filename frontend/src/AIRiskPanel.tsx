@@ -108,7 +108,13 @@ const actionButton: CSSProperties = {
   textAlign: 'center',
 }
 
-export default function AIRiskPanel() {
+type AIRiskPanelProps = {
+  onOpenCheckout?: () => void
+}
+
+export default function AIRiskPanel({
+  onOpenCheckout,
+}: AIRiskPanelProps) {
   const [customerId, setCustomerId] = useDemoCustomer()
 
   const [transactionType, setTransactionType] =
@@ -905,7 +911,19 @@ export default function AIRiskPanel() {
                   </button>
                 </div>
               </div>
-
+               <button
+  type="button"
+  onClick={onOpenCheckout}
+  disabled={!onOpenCheckout}
+  style={{
+    ...actionButton,
+    background: '#ffffff',
+    color: '#5269ed',
+    border: '1px solid #ccd6f1',
+  }}
+>
+  Explore PayPal Sandbox ↗
+</button>     
               {/* PRECAUTIONS */}
 
               <div

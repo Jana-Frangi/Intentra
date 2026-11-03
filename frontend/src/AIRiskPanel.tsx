@@ -39,9 +39,7 @@ async function postJSON<T>(
 ): Promise<T> {
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
     body: JSON.stringify(payload),
   })
@@ -101,6 +99,15 @@ const insightBox: CSSProperties = {
   borderRadius: '12px',
 }
 
+const actionButton: CSSProperties = {
+  padding: '13px 16px',
+  borderRadius: '10px',
+  fontSize: '12px',
+  fontWeight: 700,
+  cursor: 'pointer',
+  textAlign: 'center',
+}
+
 export default function AIRiskPanel() {
   const [customerId, setCustomerId] = useDemoCustomer()
 
@@ -118,17 +125,19 @@ export default function AIRiskPanel() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [mlUnavailable, setMlUnavailable] = useState(false)
+  const [mlUnavailable, setMlUnavailable] =
+    useState(false)
   const [historyUnavailable, setHistoryUnavailable] =
     useState(false)
   const [analyzedAmount, setAnalyzedAmount] =
     useState<number | null>(null)
 
-  // Discard responses from older requests.
   const requestGeneration = useRef(0)
+  const precautionsRef = useRef<HTMLDivElement>(null)
 
   function clearResults() {
     requestGeneration.current += 1
+
     setPrediction(null)
     setBehavior(null)
     setMlUnavailable(false)
@@ -138,8 +147,6 @@ export default function AIRiskPanel() {
     setLoading(false)
   }
 
-  // A safety result must not carry over to another
-  // synthetic customer.
   useEffect(() => {
     clearResults()
   }, [customerId])
@@ -220,13 +227,50 @@ export default function AIRiskPanel() {
       setAnalyzedAmount(numericAmount)
     } catch {
       if (thisRequest === requestGeneration.current) {
-        setError('The payment safety check could not finish.')
+        setError(
+          'The payment safety check could not finish.'
+        )
       }
     } finally {
       if (thisRequest === requestGeneration.current) {
         setLoading(false)
       }
     }
+  }
+
+  // NEW: Navigate to the actual customer history panel.
+  function viewHistoricalEvidence() {
+    const historySection =
+      document.querySelector<HTMLElement>(
+        '.customer-history-panel'
+      )
+
+    if (!historySection) {
+      return
+    }
+
+    historySection.setAttribute('tabindex', '-1')
+
+    historySection.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+
+    historySection.focus({
+      preventScroll: true,
+    })
+  }
+
+  // NEW: Navigate to our existing precautions list.
+  function reviewPrecautions() {
+    precautionsRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
+
+    precautionsRef.current?.focus({
+      preventScroll: true,
+    })
   }
 
   const behavioralSignals = behavior?.signals ?? []
@@ -240,21 +284,21 @@ export default function AIRiskPanel() {
     behavior !== null &&
     behavior.status !== 'INSUFFICIENT_HISTORY'
 
-  const isPartial =
-    !prediction ||
-    !behavior ||
-    behavior.status === 'INSUFFICIENT_HISTORY'
+  const isPartial = !fullyChecked
 
   return (
     <section
       className="analysis-section"
       aria-label="Payment safety check"
-      style={{ width: '100%', minWidth: 0 }}
+      style={{
+        width: '100%',
+        minWidth: 0,
+      }}
     >
-      {/* SECTION HEADING */}
-
       <div style={{ marginBottom: '26px' }}>
-        <div className="eyebrow">INTENTRA PROTECT</div>
+        <div className="eyebrow">
+          INTENTRA PROTECT
+        </div>
 
         <h2 style={{ marginBottom: '10px' }}>
           Payment Safety Check
@@ -266,8 +310,6 @@ export default function AIRiskPanel() {
         </p>
       </div>
 
-      {/* TWO-COLUMN WORKSPACE */}
-
       <div
         style={{
           display: 'grid',
@@ -278,7 +320,7 @@ export default function AIRiskPanel() {
           width: '100%',
         }}
       >
-        {/* LEFT: PAYMENT INPUTS */}
+        {/* LEFT COLUMN: PAYMENT DETAILS */}
 
         <div style={columnCard}>
           <div style={miniLabel}>
@@ -317,9 +359,15 @@ export default function AIRiskPanel() {
                   )
                 }
               >
-                <option value="0">Customer 0</option>
-                <option value="396">Customer 396</option>
-                <option value="486">Customer 486</option>
+                <option value="0">
+                  Customer 0
+                </option>
+                <option value="396">
+                  Customer 396
+                </option>
+                <option value="486">
+                  Customer 486
+                </option>
               </select>
             </label>
 
@@ -448,7 +496,7 @@ export default function AIRiskPanel() {
           </div>
         </div>
 
-        {/* RIGHT: SAFETY ASSESSMENT */}
+        {/* RIGHT COLUMN: SAFETY ASSESSMENT */}
 
         <div
           style={{
@@ -556,6 +604,8 @@ export default function AIRiskPanel() {
             </>
           ) : (
             <>
+              {/* ASSESSMENT STATUS */}
+
               <div
                 style={{
                   marginTop: '22px',
@@ -644,7 +694,7 @@ export default function AIRiskPanel() {
                 }}
               />
 
-              {/* ML INSIGHT */}
+              {/* AI INSIGHT */}
 
               <div
                 style={{
@@ -692,7 +742,7 @@ export default function AIRiskPanel() {
                 </p>
               </div>
 
-              {/* HISTORICAL INSIGHT */}
+              {/* BEHAVIORAL INSIGHT */}
 
               <div style={insightBox}>
                 <div
@@ -783,12 +833,89 @@ export default function AIRiskPanel() {
                 )}
               </div>
 
-              {/* PRECAUTIONS */}
+              {/* NEW: ACTIONABLE NEXT STEPS */}
 
               <div
                 style={{
                   marginTop: '24px',
+                  padding: '20px',
+                  border: '1px solid #dce5f7',
+                  borderRadius: '15px',
+                  background: '#ffffff',
+                }}
+              >
+                <div style={miniLabel}>
+                  03 / NEXT STEPS
+                </div>
+
+                <h4
+                  style={{
+                    fontSize: '17px',
+                    color: '#172344',
+                    margin: '10px 0 8px',
+                  }}
+                >
+                  What can you do next?
+                </h4>
+
+                <p
+                  style={{
+                    ...mutedText,
+                    marginBottom: '18px',
+                  }}
+                >
+                  Explore the historical context
+                  behind this assessment and review
+                  practical precautions before making
+                  your own decision.
+                </p>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'repeat(auto-fit, minmax(160px, 1fr))',
+                    gap: '10px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={viewHistoricalEvidence}
+                    style={{
+                      ...actionButton,
+                      background: '#5269ed',
+                      color: '#ffffff',
+                      border: '1px solid #5269ed',
+                    }}
+                  >
+                    View historical evidence ↓
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={reviewPrecautions}
+                    style={{
+                      ...actionButton,
+                      background: '#ffffff',
+                      color: '#5269ed',
+                      border: '1px solid #ccd6f1',
+                    }}
+                  >
+                    Review precautions ↓
+                  </button>
+                </div>
+              </div>
+
+              {/* PRECAUTIONS */}
+
+              <div
+                ref={precautionsRef}
+                tabIndex={-1}
+                style={{
+                  marginTop: '24px',
                   marginBottom: '22px',
+                  scrollMarginTop: '90px',
+                  outline: 'none',
                 }}
               >
                 <h4
@@ -826,7 +953,7 @@ export default function AIRiskPanel() {
                 </ul>
               </div>
 
-              {/* ANALYST DETAILS */}
+              {/* TECHNICAL DETAILS */}
 
               <details
                 style={{
@@ -911,9 +1038,10 @@ export default function AIRiskPanel() {
               >
                 PaySim AI screening and IBM TabFormer
                 behavioral history are separate synthetic
-                demonstrations. Model scores are not
-                calibrated real-world fraud probabilities.
-                No payment is automatically blocked.
+                demonstrations. The model score is not
+                a calibrated real-world fraud probability.
+                No payment is automatically blocked,
+                authorized, or captured.
               </p>
             </>
           )}

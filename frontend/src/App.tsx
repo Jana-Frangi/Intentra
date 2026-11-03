@@ -7,6 +7,7 @@ import './App.css'
 import CustomerHistoryPanel from './CustomerHistoryPanel'
 import GuidedPaymentJourney from './GuidedPaymentJourney'
 import DemoWelcome from './DemoWelcome'
+import PersonalOverview from './PersonalOverview'
 
 type View = 'overview' | 'protection' | 'checkout' | 'analyst'
 
@@ -349,6 +350,9 @@ function App() {
                   : 'none',
             }}
           >
+            <PersonalOverview
+  onOpenProtection={() => navigateTo('protection')}
+/>
             <section className="dashboard-hero">
               <div className="dashboard-hero-content">
                 <div className="hero-kicker">

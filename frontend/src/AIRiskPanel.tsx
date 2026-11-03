@@ -1,5 +1,6 @@
 
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useDemoCustomer } from './demoCustomer'
 
 type Prediction = {
@@ -65,10 +66,39 @@ function signalTitle(code: string) {
   }
 
   if (code === 'UNFAMILIAR_MERCHANT') {
-    return 'Merchant not found in recent history'
+    return 'Unfamiliar merchant'
   }
 
   return 'Additional behavioral signal'
+}
+
+const columnCard: CSSProperties = {
+  minWidth: 0,
+  padding: '24px',
+  borderRadius: '18px',
+  border: '1px solid #e1e7f4',
+  background: '#ffffff',
+}
+
+const mutedText: CSSProperties = {
+  color: '#75819b',
+  fontSize: '13px',
+  lineHeight: 1.7,
+}
+
+const miniLabel: CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 800,
+  letterSpacing: '1.5px',
+  color: '#5269ed',
+  textTransform: 'uppercase',
+}
+
+const insightBox: CSSProperties = {
+  padding: '16px',
+  background: '#f7f9fe',
+  border: '1px solid #e7ebf6',
+  borderRadius: '12px',
 }
 
 export default function AIRiskPanel() {
@@ -94,13 +124,11 @@ export default function AIRiskPanel() {
   const [analyzedAmount, setAnalyzedAmount] =
     useState<number | null>(null)
 
-  // Prevent older requests from displaying results
-  // after the demo customer changes.
+  // Discard responses from older requests.
   const requestGeneration = useRef(0)
 
-  useEffect(() => {
+  function clearResults() {
     requestGeneration.current += 1
-
     setPrediction(null)
     setBehavior(null)
     setMlUnavailable(false)
@@ -108,20 +136,21 @@ export default function AIRiskPanel() {
     setAnalyzedAmount(null)
     setError('')
     setLoading(false)
+  }
+
+  // A safety result must not carry over to another
+  // synthetic customer.
+  useEffect(() => {
+    clearResults()
   }, [customerId])
 
   async function analyze() {
-    const thisRequest = ++requestGeneration.current
-
     const numericAmount = Number(amount)
     const numericBalance = Number(balance)
 
-    setError('')
-    setPrediction(null)
-    setBehavior(null)
-    setMlUnavailable(false)
-    setHistoryUnavailable(false)
-    setAnalyzedAmount(null)
+    clearResults()
+
+    const thisRequest = requestGeneration.current
 
     if (
       amount.trim() === '' ||
@@ -133,8 +162,8 @@ export default function AIRiskPanel() {
       !merchantId.trim()
     ) {
       setError(
-        'Enter a positive amount, a valid starting balance, ' +
-        'and a merchant identifier.'
+        'Enter a positive payment amount, a valid ' +
+        'starting balance, and a merchant identifier.'
       )
       return
     }
@@ -180,7 +209,8 @@ export default function AIRiskPanel() {
       if (
         historyResult.status === 'fulfilled' &&
         typeof historyResult.value.status === 'string' &&
-        Array.isArray(historyResult.value.signals ?? [])
+        Array.isArray(historyResult.value.signals ?? []) &&
+        historyResult.value.customer_id === customerId
       ) {
         setBehavior(historyResult.value)
       } else {
@@ -188,6 +218,10 @@ export default function AIRiskPanel() {
       }
 
       setAnalyzedAmount(numericAmount)
+    } catch {
+      if (thisRequest === requestGeneration.current) {
+        setError('The payment safety check could not finish.')
+      }
     } finally {
       if (thisRequest === requestGeneration.current) {
         setLoading(false)
@@ -206,315 +240,685 @@ export default function AIRiskPanel() {
     behavior !== null &&
     behavior.status !== 'INSUFFICIENT_HISTORY'
 
+  const isPartial =
+    !prediction ||
+    !behavior ||
+    behavior.status === 'INSUFFICIENT_HISTORY'
+
   return (
-    <section className="analysis-section">
-      <div className="eyebrow">INTENTRA PROTECT</div>
+    <section
+      className="analysis-section"
+      aria-label="Payment safety check"
+      style={{ width: '100%', minWidth: 0 }}
+    >
+      {/* SECTION HEADING */}
 
-      <h2>Payment Safety Check</h2>
+      <div style={{ marginBottom: '26px' }}>
+        <div className="eyebrow">INTENTRA PROTECT</div>
 
-      <p>
-        Explore AI screening and historical spending
-        patterns using synthetic demonstration data.
-      </p>
+        <h2 style={{ marginBottom: '10px' }}>
+          Payment Safety Check
+        </h2>
+
+        <p style={mutedText}>
+          Review a proposed payment using experimental
+          AI screening and synthetic customer history.
+        </p>
+      </div>
+
+      {/* TWO-COLUMN WORKSPACE */}
 
       <div
         style={{
           display: 'grid',
-          gap: '16px',
-          maxWidth: '480px',
-          marginTop: '24px',
+          gridTemplateColumns:
+            'repeat(auto-fit, minmax(min(100%, 350px), 1fr))',
+          alignItems: 'start',
+          gap: '22px',
+          width: '100%',
         }}
       >
-        <label>
-          Demo customer
-          <select
-            value={customerId}
-            onChange={(event) =>
-              setCustomerId(Number(event.target.value))
-            }
-          >
-            <option value="0">Customer 0</option>
-            <option value="396">Customer 396</option>
-            <option value="486">Customer 486</option>
-          </select>
-        </label>
+        {/* LEFT: PAYMENT INPUTS */}
 
-        <label>
-          Transaction type
-          <select
-            value={transactionType}
-            onChange={(event) =>
-              setTransactionType(event.target.value)
-            }
-          >
-            <option value="TRANSFER">Transfer</option>
-            <option value="PAYMENT">Payment</option>
-            <option value="CASH_OUT">Cash out</option>
-            <option value="CASH_IN">Cash in</option>
-            <option value="DEBIT">Debit</option>
-          </select>
-        </label>
-
-        <label>
-          Transaction amount (demo units)
-          <input
-            type="number"
-            min="0.01"
-            step="any"
-            value={amount}
-            onChange={(event) =>
-              setAmount(event.target.value)
-            }
-          />
-        </label>
-
-        <label>
-          Starting balance for AI screening
-          (demo units)
-          <input
-            type="number"
-            min="0"
-            step="any"
-            value={balance}
-            onChange={(event) =>
-              setBalance(event.target.value)
-            }
-          />
-        </label>
-
-        <label>
-          Merchant identifier for history comparison
-          <input
-            type="text"
-            value={merchantId}
-            onChange={(event) =>
-              setMerchantId(event.target.value)
-            }
-          />
-        </label>
-
-        <button
-          type="button"
-          onClick={analyze}
-          disabled={loading}
-        >
-          {loading
-            ? 'Checking payment...'
-            : 'Check payment safety'}
-        </button>
-      </div>
-
-      {error && (
-        <p className="analysis-error" role="alert">
-          {error}
-        </p>
-      )}
-
-      {analyzedAmount !== null && (
-        <div
-          className="analysis-result"
-          style={{
-            maxWidth: '560px',
-            marginTop: '26px',
-            padding: '24px',
-          }}
-        >
-          <div className="eyebrow">
-            PAYMENT SAFETY RESULT
+        <div style={columnCard}>
+          <div style={miniLabel}>
+            01 / PAYMENT DETAILS
           </div>
 
-          <h3>
-            {needsReview
-              ? 'Extra verification recommended'
-              : fullyChecked
-                ? 'No additional alerts detected'
-                : 'Safety check partially available'}
+          <h3
+            style={{
+              margin: '10px 0 8px',
+              color: '#172344',
+              fontSize: '21px',
+            }}
+          >
+            Review a transaction
           </h3>
 
-          <p style={{ fontSize: '26px', fontWeight: 700 }}>
-            {formatAmount(analyzedAmount)} demo units
+          <p style={mutedText}>
+            Choose a demo customer and enter the
+            proposed payment details.
           </p>
 
-          <p>
-            {needsReview
-              ? 'At least one experimental screening ' +
-                'system identified a reason to review ' +
-                'this transaction.'
-              : 'No completed screening system ' +
-                'raised an additional review alert. ' +
-                'This does not guarantee safety.'}
-          </p>
+          <div
+            style={{
+              display: 'grid',
+              gap: '18px',
+              marginTop: '24px',
+            }}
+          >
+            <label>
+              Demo customer
+              <select
+                value={customerId}
+                onChange={(event) =>
+                  setCustomerId(
+                    Number(event.target.value)
+                  )
+                }
+              >
+                <option value="0">Customer 0</option>
+                <option value="396">Customer 396</option>
+                <option value="486">Customer 486</option>
+              </select>
+            </label>
 
-          <hr style={{ margin: '20px 0' }} />
+            <label>
+              Transaction type
+              <select
+                value={transactionType}
+                onChange={(event) => {
+                  setTransactionType(event.target.value)
+                  clearResults()
+                }}
+              >
+                <option value="TRANSFER">
+                  Transfer
+                </option>
+                <option value="PAYMENT">
+                  Payment
+                </option>
+                <option value="CASH_OUT">
+                  Cash out
+                </option>
+                <option value="CASH_IN">
+                  Cash in
+                </option>
+                <option value="DEBIT">
+                  Debit
+                </option>
+              </select>
+            </label>
 
-          <h4>AI transaction screening</h4>
+            <label>
+              Transaction amount (demo units)
+              <input
+                type="number"
+                min="0.01"
+                step="any"
+                value={amount}
+                onChange={(event) => {
+                  setAmount(event.target.value)
+                  clearResults()
+                }}
+              />
+            </label>
 
-          {prediction ? (
-            <p>
-              {prediction.flagged_for_review
-                ? 'The experimental AI model flagged ' +
-                  'this transaction pattern for review.'
-                : 'The experimental AI model did not ' +
-                  'trigger an alert at its current threshold.'}
-            </p>
-          ) : (
-            <p>
-              {mlUnavailable
-                ? 'AI screening is currently unavailable.'
-                : 'No AI screening result.'}
+            <label>
+              Starting balance for AI screening
+              (demo units)
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={balance}
+                onChange={(event) => {
+                  setBalance(event.target.value)
+                  clearResults()
+                }}
+              />
+            </label>
+
+            <label>
+              Merchant identifier for history comparison
+              <input
+                type="text"
+                value={merchantId}
+                onChange={(event) => {
+                  setMerchantId(event.target.value)
+                  clearResults()
+                }}
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={analyze}
+              disabled={loading}
+              style={{
+                width: '100%',
+                marginTop: '6px',
+              }}
+            >
+              {loading
+                ? 'Checking payment...'
+                : 'Check payment safety'}
+            </button>
+          </div>
+
+          {error && (
+            <p
+              className="analysis-error"
+              role="alert"
+              style={{ marginTop: '16px' }}
+            >
+              {error}
             </p>
           )}
 
-          <h4 style={{ marginTop: '20px' }}>
-            Customer spending history
-          </h4>
+          <div
+            style={{
+              ...insightBox,
+              marginTop: '24px',
+            }}
+          >
+            <strong
+              style={{
+                fontSize: '12px',
+                color: '#27365b',
+              }}
+            >
+              About this demonstration
+            </strong>
 
-          {behavior ? (
+            <p
+              style={{
+                ...mutedText,
+                margin: '8px 0 0',
+                fontSize: '12px',
+              }}
+            >
+              AI screening uses PaySim synthetic
+              mobile-money data. Customer behavioral
+              analysis uses separate IBM synthetic
+              credit-card records. Results are
+              experimental recommendations, not
+              verified fraud decisions.
+            </p>
+          </div>
+        </div>
+
+        {/* RIGHT: SAFETY ASSESSMENT */}
+
+        <div
+          style={{
+            ...columnCard,
+            background: '#f8faff',
+            borderColor: '#dce4fa',
+          }}
+        >
+          <div style={miniLabel}>
+            02 / SAFETY ASSESSMENT
+          </div>
+
+          {analyzedAmount === null ? (
             <>
-              <p>
-                Analyzed {behavior.history_count} previous
-                transactions for demo customer{' '}
-                {behavior.customer_id}.
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 20,
+                  background: '#e8edff',
+                  color: '#5269ed',
+                  fontSize: '30px',
+                  marginTop: '30px',
+                  marginBottom: '22px',
+                }}
+                aria-hidden="true"
+              >
+                ◇
+              </div>
+
+              <h3
+                style={{
+                  fontSize: '23px',
+                  color: '#172344',
+                  marginBottom: '12px',
+                }}
+              >
+                {loading
+                  ? 'Reviewing this payment'
+                  : 'Ready for review'}
+              </h3>
+
+              <p style={mutedText}>
+                {loading
+                  ? 'Intentra is checking the proposed ' +
+                    'payment against two experimental systems.'
+                  : 'Enter the payment details on the left ' +
+                    'and select Check payment safety to ' +
+                    'view a recommendation.'}
               </p>
 
-              {behavior.status ===
-                'INSUFFICIENT_HISTORY' ? (
-                  <p>
-                    There is not enough history to make
-                    a reliable behavioral comparison.
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '12px',
+                  marginTop: '28px',
+                }}
+              >
+                <div style={insightBox}>
+                  <strong>
+                    AI transaction screening
+                  </strong>
+                  <p
+                    style={{
+                      ...mutedText,
+                      margin: '6px 0 0',
+                    }}
+                  >
+                    {loading
+                      ? 'Analysis in progress'
+                      : 'Awaiting transaction details'}
                   </p>
-                ) : (
+                </div>
+
+                <div style={insightBox}>
+                  <strong>
+                    Customer spending history
+                  </strong>
+                  <p
+                    style={{
+                      ...mutedText,
+                      margin: '6px 0 0',
+                    }}
+                  >
+                    {loading
+                      ? 'Historical comparison in progress'
+                      : `Ready to compare with Customer ${customerId}`}
+                  </p>
+                </div>
+              </div>
+
+              <p
+                style={{
+                  ...mutedText,
+                  fontSize: '11px',
+                  marginTop: '24px',
+                }}
+              >
+                This tool does not authorize, block,
+                or capture a payment.
+              </p>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  marginTop: '22px',
+                  marginBottom: '18px',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 12px',
+                    borderRadius: 20,
+                    background: needsReview
+                      ? '#fff0df'
+                      : fullyChecked
+                        ? '#e8f6ed'
+                        : '#edf1fa',
+                    color: needsReview
+                      ? '#9c6215'
+                      : fullyChecked
+                        ? '#276944'
+                        : '#58677f',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                  }}
+                >
+                  {needsReview
+                    ? 'ADDITIONAL REVIEW SUGGESTED'
+                    : fullyChecked
+                      ? 'NO ADDITIONAL ALERTS'
+                      : 'PARTIAL CHECK'}
+                </span>
+              </div>
+
+              <h3
+                style={{
+                  fontSize: '23px',
+                  color: '#172344',
+                  lineHeight: 1.3,
+                  marginBottom: '16px',
+                }}
+              >
+                {needsReview
+                  ? 'Extra verification recommended'
+                  : fullyChecked
+                    ? 'No additional alerts detected'
+                    : 'Safety check partially available'}
+              </h3>
+
+              <div
+                style={{
+                  fontSize: '28px',
+                  fontWeight: 800,
+                  color: '#172344',
+                  marginBottom: '8px',
+                }}
+              >
+                {formatAmount(analyzedAmount)}
+              </div>
+
+              <p style={mutedText}>
+                Demo units · Customer {customerId}
+              </p>
+
+              <p
+                style={{
+                  ...mutedText,
+                  marginTop: '18px',
+                }}
+              >
+                {needsReview
+                  ? 'At least one experimental screening ' +
+                    'system identified a reason to review ' +
+                    'this proposed payment.'
+                  : isPartial
+                    ? 'Some screening information was unavailable. ' +
+                      'The payment cannot be fully assessed.'
+                    : 'Neither completed screening system raised ' +
+                      'an alert. This does not guarantee safety.'}
+              </p>
+
+              <div
+                style={{
+                  height: 1,
+                  background: '#dde5f4',
+                  margin: '24px 0',
+                }}
+              />
+
+              {/* ML INSIGHT */}
+
+              <div
+                style={{
+                  ...insightBox,
+                  marginBottom: '14px',
+                }}
+              >
+                <div
+                  style={{
+                    ...miniLabel,
+                    marginBottom: '8px',
+                  }}
+                >
+                  AI SCREENING
+                </div>
+
+                <strong
+                  style={{ color: '#172344' }}
+                >
+                  {prediction
+                    ? prediction.flagged_for_review
+                      ? 'Pattern flagged for review'
+                      : 'No model alert triggered'
+                    : 'Screening unavailable'}
+                </strong>
+
+                <p
+                  style={{
+                    ...mutedText,
+                    margin: '9px 0 0',
+                  }}
+                >
+                  {prediction
+                    ? prediction.flagged_for_review
+                      ? 'The experimental AI model ' +
+                        'identified a transaction pattern ' +
+                        'that warrants attention.'
+                      : 'The experimental AI model did ' +
+                        'not flag this pattern at its ' +
+                        'current decision threshold.'
+                    : mlUnavailable
+                      ? 'The AI screening service did ' +
+                        'not return a usable result.'
+                      : 'No AI result is available.'}
+                </p>
+              </div>
+
+              {/* HISTORICAL INSIGHT */}
+
+              <div style={insightBox}>
+                <div
+                  style={{
+                    ...miniLabel,
+                    marginBottom: '8px',
+                  }}
+                >
+                  BEHAVIORAL CONTEXT
+                </div>
+
+                <strong
+                  style={{ color: '#172344' }}
+                >
+                  {behavior
+                    ? behavior.status ===
+                      'INSUFFICIENT_HISTORY'
+                      ? 'Insufficient history'
+                      : behavior.status ===
+                          'REVIEW_SUGGESTED'
+                        ? 'Historical patterns warrant review'
+                        : 'No behavioral alerts triggered'
+                    : 'Historical comparison unavailable'}
+                </strong>
+
+                {behavior ? (
                   <>
+                    <p
+                      style={{
+                        ...mutedText,
+                        margin: '9px 0',
+                      }}
+                    >
+                      Compared with{' '}
+                      {behavior.history_count} recent
+                      historical transactions for
+                      Customer {behavior.customer_id}.
+                    </p>
+
                     {behavior.median_previous_amount !==
                       undefined && (
-                        <p>
-                          Typical recent amount (median):{' '}
-                          <strong>
-                            {formatAmount(
-                              behavior.median_previous_amount
-                            )}
-                          </strong>
-                        </p>
-                      )}
+                      <p style={mutedText}>
+                        Typical recent amount:{' '}
+                        <strong>
+                          {formatAmount(
+                            behavior.median_previous_amount
+                          )}
+                        </strong>
+                      </p>
+                    )}
 
-                    {behavioralSignals.length > 0 ? (
-                      <ul>
+                    {behavioralSignals.length > 0 && (
+                      <ul
+                        style={{
+                          paddingLeft: '18px',
+                          color: '#334366',
+                          fontSize: '12px',
+                          lineHeight: 1.7,
+                        }}
+                      >
                         {behavioralSignals.map(
                           (signal, index) => (
                             <li
                               key={`${signal.code}-${index}`}
                             >
                               <strong>
-                                {signalTitle(signal.code)}:
-                              </strong>{' '}
-                              {signal.message}
+                                {signalTitle(signal.code)}
+                              </strong>
+                              : {signal.message}
                             </li>
                           )
                         )}
                       </ul>
-                    ) : (
-                      <p>
-                        No alerts were triggered by the
-                        current historical comparison rules.
-                      </p>
                     )}
                   </>
+                ) : (
+                  <p
+                    style={{
+                      ...mutedText,
+                      margin: '9px 0 0',
+                    }}
+                  >
+                    {historyUnavailable
+                      ? 'The historical analysis service ' +
+                        'did not return a usable result.'
+                      : 'No comparison available.'}
+                  </p>
                 )}
+              </div>
+
+              {/* PRECAUTIONS */}
+
+              <div
+                style={{
+                  marginTop: '24px',
+                  marginBottom: '22px',
+                }}
+              >
+                <h4
+                  style={{
+                    color: '#172344',
+                    marginBottom: '12px',
+                  }}
+                >
+                  Recommended precautions
+                </h4>
+
+                <ul
+                  style={{
+                    paddingLeft: '19px',
+                    color: '#52617e',
+                    lineHeight: 1.9,
+                    fontSize: '12px',
+                  }}
+                >
+                  <li>
+                    Confirm that you recognize the recipient.
+                  </li>
+                  <li>
+                    Double-check the payment amount.
+                  </li>
+                  <li>
+                    Be cautious of urgent or unexpected requests.
+                  </li>
+                  {needsReview && (
+                    <li>
+                      Consider an additional verification
+                      step before proceeding.
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              {/* ANALYST DETAILS */}
+
+              <details
+                style={{
+                  borderTop: '1px solid #dde5f4',
+                  paddingTop: '18px',
+                }}
+              >
+                <summary
+                  style={{
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#5269ed',
+                  }}
+                >
+                  Technical details (analyst view)
+                </summary>
+
+                <div
+                  style={{
+                    ...mutedText,
+                    marginTop: '14px',
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {prediction && (
+                    <>
+                      <p>
+                        Model: {prediction.model_version}
+                      </p>
+                      <p>
+                        Model score:{' '}
+                        {prediction.model_score.toFixed(6)}
+                      </p>
+                      <p>
+                        Decision threshold:{' '}
+                        {prediction.decision_threshold.toFixed(6)}
+                      </p>
+                      <p>
+                        Score calibrated:{' '}
+                        {prediction.score_calibrated
+                          ? 'Yes'
+                          : 'No'}
+                      </p>
+                    </>
+                  )}
+
+                  {behavior && (
+                    <>
+                      <p>
+                        Behavior status: {behavior.status}
+                      </p>
+                      <p>
+                        Historical records:{' '}
+                        {behavior.history_count}
+                      </p>
+                      <p>
+                        Amount-to-median ratio:{' '}
+                        {behavior.amount_to_median_ratio ??
+                          'Unavailable'}
+                      </p>
+                      <p>
+                        Merchant recently seen:{' '}
+                        {behavior.merchant_seen_in_recent_history ===
+                        undefined
+                          ? 'Unknown'
+                          : behavior.merchant_seen_in_recent_history
+                            ? 'Yes'
+                            : 'No'}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </details>
+
+              <p
+                style={{
+                  ...mutedText,
+                  fontSize: '11px',
+                  marginTop: '22px',
+                }}
+              >
+                PaySim AI screening and IBM TabFormer
+                behavioral history are separate synthetic
+                demonstrations. Model scores are not
+                calibrated real-world fraud probabilities.
+                No payment is automatically blocked.
+              </p>
             </>
-          ) : (
-            <p>
-              {historyUnavailable
-                ? 'Historical comparison is currently unavailable.'
-                : 'No historical comparison result.'}
-            </p>
           )}
-
-          <div style={{ marginTop: '20px' }}>
-            <h4>Recommended precautions</h4>
-            <ul>
-              <li>Confirm you recognize the recipient.</li>
-              <li>Double-check the amount.</li>
-              <li>
-                Be cautious of unexpected or urgent
-                payment requests.
-              </li>
-              {needsReview && (
-                <li>
-                  Consider an additional verification
-                  step before proceeding.
-                </li>
-              )}
-            </ul>
-          </div>
-
-          <p style={{ marginTop: '20px' }}>
-            <small>
-              Prototype demonstration using two separate
-              synthetic datasets: PaySim for AI screening
-              and IBM TabFormer for customer history.
-              Their scores and histories do not describe
-              a single real PayPal customer. No payment
-              is automatically blocked.
-            </small>
-          </p>
-
-          <details style={{ marginTop: '20px' }}>
-            <summary style={{ cursor: 'pointer' }}>
-              Technical details (analyst view)
-            </summary>
-
-            {prediction && (
-              <div style={{ marginTop: '12px' }}>
-                <p>
-                  ML model: {prediction.model_version}
-                </p>
-                <p>
-                  Model score:{' '}
-                  {prediction.model_score.toFixed(6)}
-                </p>
-                <p>
-                  Review threshold:{' '}
-                  {prediction.decision_threshold.toFixed(6)}
-                </p>
-                <p>
-                  Model score calibrated:{' '}
-                  {prediction.score_calibrated
-                    ? 'Yes'
-                    : 'No'}
-                </p>
-              </div>
-            )}
-
-            {behavior && (
-              <div>
-                <p>
-                  Behavioral status: {behavior.status}
-                </p>
-                <p>
-                  Customer ID: {behavior.customer_id}
-                </p>
-                <p>
-                  History records: {behavior.history_count}
-                </p>
-                <p>
-                  Amount-to-median ratio:{' '}
-                  {behavior.amount_to_median_ratio ??
-                    'Unavailable'}
-                </p>
-                <p>
-                  Merchant seen in recent history:{' '}
-                  {behavior.merchant_seen_in_recent_history ===
-                  undefined
-                    ? 'Unknown'
-                    : behavior.merchant_seen_in_recent_history
-                      ? 'Yes'
-                      : 'No'}
-                </p>
-              </div>
-            )}
-          </details>
         </div>
-      )}
+      </div>
     </section>
   )
 }

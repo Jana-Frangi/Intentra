@@ -5,6 +5,7 @@ import AIRiskPanel from './AIRiskPanel'
 import PayPalCheckout from './PayPalCheckout'
 import './App.css'
 import CustomerHistoryPanel from './CustomerHistoryPanel'
+import GuidedPaymentJourney from './GuidedPaymentJourney'
 
 type View = 'overview' | 'protection' | 'checkout' | 'analyst'
 
@@ -464,6 +465,7 @@ function App() {
 
                   <h2>Choose your next action</h2>
                 </div>
+                
               </div>
 
               <div className="capability-grid">
@@ -540,6 +542,10 @@ function App() {
                 </article>
               </div>
             </section>
+            <GuidedPaymentJourney
+              onOpenProtection={() => navigateTo('protection')}
+              onOpenCheckout={() => navigateTo('checkout')}
+            />
           </div>
 
           {/* ===================================

@@ -4,6 +4,7 @@ import type { FormEvent } from 'react'
 import AIRiskPanel from './AIRiskPanel'
 import PayPalCheckout from './PayPalCheckout'
 import './App.css'
+import CustomerHistoryPanel from './CustomerHistoryPanel'
 
 type View = 'overview' | 'protection' | 'checkout' | 'analyst'
 
@@ -572,6 +573,7 @@ function App() {
 
               <div className="workspace-card protect-card">
                 <AIRiskPanel />
+                <CustomerHistoryPanel />
               </div>
             </section>
           </div>

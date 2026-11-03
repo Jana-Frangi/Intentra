@@ -14,6 +14,7 @@ from payment_capture import process_sandbox_capture
 from payment_capture import process_sandbox_capture
 from ml_predictor import predict_transaction
 from behavioral_intelligence import analyze_customer_behavior
+from customer_history import get_customer_history
 
 # --------------------------------------------------
 # PAYMENT CAPTURE FEATURE FLAG
@@ -318,6 +319,29 @@ def analyze_transaction_history(request: BehavioralAnalysisRequest):
             transaction_time=request.transaction_time,
         )
 
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from None
+
+
+# --------------------------------------------------
+# INTENTRA - CUSTOMER TRANSACTION HISTORY
+# --------------------------------------------------
+
+@app.get("/history/customer/{customer_id}")
+def read_customer_history(
+    customer_id: int,
+    limit: int = 20,
+    before: str = "2025-01-01T00:00",
+):
+    try:
+        return get_customer_history(
+            customer_id=customer_id,
+            limit=limit,
+            before=before,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=422,

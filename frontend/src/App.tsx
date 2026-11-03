@@ -6,6 +6,7 @@ import PayPalCheckout from './PayPalCheckout'
 import './App.css'
 import CustomerHistoryPanel from './CustomerHistoryPanel'
 import GuidedPaymentJourney from './GuidedPaymentJourney'
+import DemoWelcome from './DemoWelcome'
 
 type View = 'overview' | 'protection' | 'checkout' | 'analyst'
 
@@ -38,6 +39,7 @@ const navigation: {
 ]
 
 function App() {
+  const [demoActive, setDemoActive] = useState(false)
   // ------------------------------------------
   // DASHBOARD NAVIGATION
   // ------------------------------------------
@@ -189,7 +191,13 @@ function App() {
       setIsAnalyzing(false)
     }
   }
-
+  if (!demoActive) {
+    return (
+      <DemoWelcome
+        onEnter={() => setDemoActive(true)}
+      />
+    )
+  }
   return (
     <div className="intentra-app">
       {/* =====================================
@@ -303,7 +311,27 @@ function App() {
               {apiStatus}
             </span>
 
-            <span className="demo-avatar">I</span>
+            <button
+  type="button"
+  onClick={() => {
+    setActiveView('overview')
+    setDemoActive(false)
+  }}
+  style={{
+    padding: '9px 14px',
+    background: '#f0f3ff',
+    color: '#4358c6',
+    border: '1px solid #dfe5fa',
+    borderRadius: '10px',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  }}
+>
+  Exit demo
+</button>
+
+<span className="demo-avatar">AM</span>
           </div>
         </header>
 

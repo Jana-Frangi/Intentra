@@ -1,5 +1,6 @@
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useDemoCustomer } from './demoCustomer'
 
 type Prediction = {
   model_version: string
@@ -71,7 +72,8 @@ function signalTitle(code: string) {
 }
 
 export default function AIRiskPanel() {
-  const [customerId, setCustomerId] = useState('0')
+  const [customerId, setCustomerId] = useDemoCustomer()
+
   const [transactionType, setTransactionType] =
     useState('TRANSFER')
   const [amount, setAmount] = useState('1500')
@@ -92,7 +94,25 @@ export default function AIRiskPanel() {
   const [analyzedAmount, setAnalyzedAmount] =
     useState<number | null>(null)
 
+  // Prevent older requests from displaying results
+  // after the demo customer changes.
+  const requestGeneration = useRef(0)
+
+  useEffect(() => {
+    requestGeneration.current += 1
+
+    setPrediction(null)
+    setBehavior(null)
+    setMlUnavailable(false)
+    setHistoryUnavailable(false)
+    setAnalyzedAmount(null)
+    setError('')
+    setLoading(false)
+  }, [customerId])
+
   async function analyze() {
+    const thisRequest = ++requestGeneration.current
+
     const numericAmount = Number(amount)
     const numericBalance = Number(balance)
 
@@ -131,13 +151,17 @@ export default function AIRiskPanel() {
         postJSON<BehaviorResult>(
           '/api/behavior/analyze-history',
           {
-            customer_id: Number(customerId),
+            customer_id: customerId,
             amount: numericAmount,
             merchant_id: merchantId.trim(),
             transaction_time: DEMO_TIMESTAMP,
           }
         ),
       ])
+
+      if (thisRequest !== requestGeneration.current) {
+        return
+      }
 
       const mlResult = results[0]
       const historyResult = results[1]
@@ -165,7 +189,9 @@ export default function AIRiskPanel() {
 
       setAnalyzedAmount(numericAmount)
     } finally {
-      setLoading(false)
+      if (thisRequest === requestGeneration.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -204,7 +230,7 @@ export default function AIRiskPanel() {
           <select
             value={customerId}
             onChange={(event) =>
-              setCustomerId(event.target.value)
+              setCustomerId(Number(event.target.value))
             }
           >
             <option value="0">Customer 0</option>

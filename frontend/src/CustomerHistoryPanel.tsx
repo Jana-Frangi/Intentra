@@ -1,5 +1,10 @@
 
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
+import {
+  DEMO_CUSTOMERS,
+  useDemoCustomer,
+} from './demoCustomer'
 
 type Transaction = {
   id: number
@@ -25,21 +30,31 @@ type CustomerHistory = {
   note: string
 }
 
-const CUSTOMERS = [0, 396, 486]
-
-function formatNumber(value: number) {
-  return value.toLocaleString('en-US')
-}
-
-function formatAmount(value: number) {
-  return value.toLocaleString('en-US', {
+function formatAmount(amount: number) {
+  return amount.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
 }
 
+const statsGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gap: 14,
+  marginBottom: 24,
+}
+
+const panel: CSSProperties = {
+  border: '1px solid #e4e9f6',
+  borderRadius: 16,
+  padding: 22,
+  marginBottom: 24,
+  background: '#fff',
+}
+
 export default function CustomerHistoryPanel() {
-  const [customerId, setCustomerId] = useState(0)
+  const [customerId, setCustomerId] = useDemoCustomer()
+
   const [history, setHistory] =
     useState<CustomerHistory | null>(null)
   const [loading, setLoading] = useState(true)
@@ -76,17 +91,21 @@ export default function CustomerHistoryPanel() {
           result.synthetic_data !== true ||
           !Array.isArray(result.transactions)
         ) {
-          throw new Error('Invalid history response.')
+          throw new Error(
+            'Invalid customer history response'
+          )
         }
 
-        setHistory(result)
-      } catch (err) {
-        if (controller.signal.aborted) return
-
-        setError(
-          'Could not load customer history. ' +
-          'Check that the backend and IBM database are available.'
-        )
+        if (!controller.signal.aborted) {
+          setHistory(result)
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setError(
+            'Could not load customer history. Check ' +
+            'the backend and IBM demo database.'
+          )
+        }
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false)
@@ -94,30 +113,29 @@ export default function CustomerHistoryPanel() {
       }
     }
 
-    loadHistory()
+    void loadHistory()
 
     return () => controller.abort()
   }, [customerId])
 
-  const recentTransactions = history?.transactions ?? []
+  const transactions = history?.transactions ?? []
 
-  // Display the 10 latest transactions chronologically.
-  // We use magnitudes for chart height, while preserving
-  // signed amounts in labels and the transaction table.
-  const chartTransactions = recentTransactions
+  const chartTransactions = transactions
     .slice(0, 10)
     .reverse()
 
   const maxMagnitude = Math.max(
     1,
-    ...chartTransactions.map((tx) => Math.abs(tx.amount))
+    ...chartTransactions.map(
+      (transaction) => Math.abs(transaction.amount)
+    )
   )
 
   return (
     <section
       className="customer-history-panel"
       aria-label="Customer transaction history"
-      style={{ marginTop: '32px' }}
+      style={{ marginTop: 32 }}
     >
       <div
         style={{
@@ -125,44 +143,54 @@ export default function CustomerHistoryPanel() {
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '16px',
-          marginBottom: '24px',
+          gap: 16,
+          marginBottom: 24,
         }}
       >
         <div>
-          <div className="eyebrow">HISTORICAL INSIGHTS</div>
+          <div className="eyebrow">
+            HISTORICAL INSIGHTS
+          </div>
+
           <h2 style={{ margin: '0 0 8px' }}>
             Customer Activity
           </h2>
-          <p style={{ color: '#78839b', fontSize: '13px' }}>
-            Explore recorded activity from IBM's
-            synthetic credit-card dataset.
+
+          <p
+            style={{
+              color: '#78839b',
+              fontSize: 13,
+            }}
+          >
+            Recorded activity from IBM's synthetic
+            credit-card data.
           </p>
         </div>
 
         <label
           style={{
             display: 'grid',
-            gap: '7px',
-            fontSize: '12px',
+            gap: 7,
+            fontSize: 12,
             fontWeight: 700,
           }}
         >
-          Demo customer
+          Demo customer · shared with safety check
+
           <select
             value={customerId}
             onChange={(event) =>
               setCustomerId(Number(event.target.value))
             }
             style={{
-              padding: '12px',
+              padding: 12,
               border: '1px solid #dfe5f0',
-              borderRadius: '10px',
+              borderRadius: 10,
               background: '#fff',
               color: '#233054',
             }}
           >
-            {CUSTOMERS.map((id) => (
+            {DEMO_CUSTOMERS.map((id) => (
               <option key={id} value={id}>
                 Customer {id}
               </option>
@@ -173,7 +201,7 @@ export default function CustomerHistoryPanel() {
 
       {loading && (
         <p role="status">
-          Loading customer history...
+          Loading customer {customerId}'s history...
         </p>
       )}
 
@@ -185,21 +213,15 @@ export default function CustomerHistoryPanel() {
 
       {history && (
         <>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns:
-                'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: '14px',
-              marginBottom: '25px',
-            }}
-          >
+          {/* CUSTOMER STATISTICS */}
+
+          <div style={statsGrid}>
             {[
               {
                 label: 'Historical transactions',
-                value: formatNumber(
+                value:
                   history.total_historical_transactions
-                ),
+                    .toLocaleString('en-US'),
               },
               {
                 label: 'Typical recent amount',
@@ -221,131 +243,133 @@ export default function CustomerHistoryPanel() {
               },
               {
                 label: 'Recent merchants',
-                value: formatNumber(
+                value:
                   history.unique_recent_merchants
-                ),
+                    .toLocaleString('en-US'),
               },
-            ].map((item) => (
+            ].map((stat) => (
               <div
-                key={item.label}
+                key={stat.label}
                 style={{
-                  background: '#f6f8ff',
+                  padding: 20,
                   border: '1px solid #e4e9f6',
-                  borderRadius: '15px',
-                  padding: '20px',
+                  borderRadius: 15,
+                  background: '#f6f8ff',
                 }}
               >
                 <div
                   style={{
                     color: '#78839b',
-                    fontSize: '12px',
-                    marginBottom: '12px',
+                    fontSize: 12,
+                    marginBottom: 12,
                   }}
                 >
-                  {item.label}
+                  {stat.label}
                 </div>
+
                 <div
                   style={{
                     color: '#172344',
+                    fontSize: 24,
                     fontWeight: 800,
-                    fontSize: '24px',
                   }}
                 >
-                  {item.value}
+                  {stat.value}
                 </div>
               </div>
             ))}
           </div>
 
-          <div
-            style={{
-              border: '1px solid #e4e9f6',
-              borderRadius: '17px',
-              padding: '22px',
-              marginBottom: '25px',
-            }}
-          >
+          {/* TRANSACTION CHART */}
+
+          <div style={panel}>
             <h3 style={{ marginTop: 0 }}>
               Recent transaction activity
             </h3>
 
             <p
               style={{
-                fontSize: '12px',
                 color: '#78839b',
+                fontSize: 12,
               }}
             >
-              Latest 10 transactions · Bar heights show
-              absolute amounts
+              Latest ten recorded transactions.
+              Bar heights represent absolute amounts.
             </p>
 
             {chartTransactions.length === 0 ? (
-              <p>No historical transactions available.</p>
+              <p>
+                No historical transactions available.
+              </p>
             ) : (
               <div
+                role="img"
+                aria-label={
+                  'Absolute amounts of the ten ' +
+                  'latest synthetic transactions'
+                }
                 style={{
                   display: 'flex',
                   alignItems: 'end',
-                  gap: '10px',
-                  height: '210px',
-                  paddingTop: '20px',
-                  borderBottom: '1px solid #dfe5f0',
+                  gap: 10,
+                  height: 210,
+                  paddingTop: 20,
+                  borderBottom:
+                    '1px solid #dfe5f0',
                 }}
-                role="img"
-                aria-label="Bar chart of the absolute amounts of the ten latest transactions"
               >
-                {chartTransactions.map((tx) => {
-                  const magnitude = Math.abs(tx.amount)
-                  const height = Math.max(
-                    3,
-                    (magnitude / maxMagnitude) * 100
-                  )
-
-                  return (
+                {chartTransactions.map(
+                  (transaction) => (
                     <div
-                      key={tx.id}
+                      key={transaction.id}
                       title={
-                        `${tx.date} | ` +
-                        `Signed amount: ${formatAmount(tx.amount)}`
+                        `${transaction.date} | ` +
+                        `signed amount: ` +
+                        formatAmount(
+                          transaction.amount
+                        )
                       }
                       style={{
                         flex: 1,
                         minWidth: 0,
-                        height: `${height}%`,
+                        height: `${
+                          Math.max(
+                            3,
+                            Math.abs(
+                              transaction.amount
+                            ) / maxMagnitude * 100
+                          )
+                        }%`,
                         borderRadius: '7px 7px 0 0',
                         background:
-                          tx.amount < 0
+                          transaction.amount < 0
                             ? '#a59bcf'
                             : 'linear-gradient(180deg, #7487fa, #5066e4)',
-                        position: 'relative',
                       }}
                     />
                   )
-                })}
+                )}
               </div>
             )}
 
             <p
               style={{
                 color: '#8d98ae',
-                fontSize: '11px',
-                marginTop: '12px',
+                fontSize: 11,
+                marginTop: 12,
               }}
             >
-              Blue: positive recorded amounts · Purple:
-              negative recorded amounts. Negative values
-              may represent credits or reversals; their
-              meaning has not been independently verified.
+              Blue: positive recorded amounts.
+              Purple: negative recorded amounts.
+              Signed values are preserved below;
+              negative entries are not assumed
+              to be refunds.
             </p>
           </div>
 
-          <div
-            style={{
-              border: '1px solid #e4e9f6',
-              borderRadius: '17px',
-              padding: '20px',
-            }}
-          >
+          {/* TRANSACTION TABLE */}
+
+          <div style={panel}>
             <h3 style={{ marginTop: 0 }}>
               Recent transactions
             </h3>
@@ -355,7 +379,7 @@ export default function CustomerHistoryPanel() {
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
-                  fontSize: '12px',
+                  fontSize: 12,
                   textAlign: 'left',
                 }}
               >
@@ -365,7 +389,7 @@ export default function CustomerHistoryPanel() {
                       'Date',
                       'Merchant ID',
                       'Location',
-                      'Amount',
+                      'Signed amount',
                     ].map((heading) => (
                       <th
                         key={heading}
@@ -374,7 +398,6 @@ export default function CustomerHistoryPanel() {
                           color: '#78839b',
                           borderBottom:
                             '1px solid #e4e9f6',
-                          whiteSpace: 'nowrap',
                         }}
                       >
                         {heading}
@@ -384,78 +407,92 @@ export default function CustomerHistoryPanel() {
                 </thead>
 
                 <tbody>
-                  {recentTransactions.map((tx) => (
-                    <tr key={tx.id}>
-                      <td
-                        style={{
-                          padding: '14px 12px',
-                          borderBottom:
-                            '1px solid #f0f2f8',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {tx.date.replace('T', ' ')}
-                      </td>
+                  {transactions.map(
+                    (transaction) => (
+                      <tr key={transaction.id}>
+                        <td
+                          style={{
+                            padding: '14px 12px',
+                            borderBottom:
+                              '1px solid #f0f2f8',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {transaction.date.replace(
+                            'T',
+                            ' '
+                          )}
+                        </td>
 
-                      <td
-                        style={{
-                          padding: '14px 12px',
-                          borderBottom:
-                            '1px solid #f0f2f8',
-                          fontFamily: 'monospace',
-                        }}
-                      >
-                        {tx.merchant_id}
-                      </td>
+                        <td
+                          style={{
+                            padding: '14px 12px',
+                            borderBottom:
+                              '1px solid #f0f2f8',
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {transaction.merchant_id}
+                        </td>
 
-                      <td
-                        style={{
-                          padding: '14px 12px',
-                          borderBottom:
-                            '1px solid #f0f2f8',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {[tx.city, tx.state]
-                          .filter(Boolean)
-                          .join(', ') || 'Unknown'}
-                      </td>
+                        <td
+                          style={{
+                            padding: '14px 12px',
+                            borderBottom:
+                              '1px solid #f0f2f8',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {[
+                            transaction.city,
+                            transaction.state,
+                          ]
+                            .filter(Boolean)
+                            .join(', ') || 'Unknown'}
+                        </td>
 
-                      <td
-                        style={{
-                          padding: '14px 12px',
-                          borderBottom:
-                            '1px solid #f0f2f8',
-                          fontWeight: 700,
-                          color:
-                            tx.amount < 0
-                              ? '#7165a7'
-                              : '#233054',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {formatAmount(tx.amount)}
-                      </td>
-                    </tr>
-                  ))}
+                        <td
+                          style={{
+                            padding: '14px 12px',
+                            borderBottom:
+                              '1px solid #f0f2f8',
+                            fontWeight: 700,
+                            color:
+                              transaction.amount < 0
+                                ? '#7165a7'
+                                : '#233054',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {formatAmount(
+                            transaction.amount
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
+          {/* DATASET DISCLOSURE */}
+
           <p
             style={{
-              marginTop: '18px',
-              fontSize: '11px',
+              fontSize: 11,
               color: '#8993a6',
               lineHeight: 1.7,
             }}
           >
-            {history.note} Summary figures are based
-            on the most recent{' '}
-            {history.recent_sample_size} transactions,
-            not the customer's entire history. Amounts
-            are shown in dataset units.
+            {history.note} Summary statistics
+            represent the most recent{' '}
+            {history.recent_sample_size} historical
+            transactions, not the full history.
+            Amounts use dataset units. The
+            transaction history and PaySim ML model
+            are separate synthetic demonstrations,
+            not a real PayPal account.
           </p>
         </>
       )}

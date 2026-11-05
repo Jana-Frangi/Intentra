@@ -8,6 +8,7 @@ import CustomerHistoryPanel from './CustomerHistoryPanel'
 import GuidedPaymentJourney from './GuidedPaymentJourney'
 import DemoWelcome from './DemoWelcome'
 import PersonalOverview from './PersonalOverview'
+import IntentraChat from "./IntentraChat";
 
 type View = 'overview' | 'protection' | 'checkout' | 'analyst'
 
@@ -614,6 +615,7 @@ function App() {
   onOpenCheckout={() => navigateTo('checkout')}
 />
                 <CustomerHistoryPanel />
+                <IntentraChat />
               </div>
             </section>
           </div>

@@ -15,6 +15,10 @@ from payment_capture import process_sandbox_capture
 from ml_predictor import predict_transaction
 from behavioral_intelligence import analyze_customer_behavior
 from customer_history import get_customer_history
+from payment_advisor import create_payment_advice
+from typing import Literal
+from ai_advisor import generate_ai_reply, AIAdvisorUnavailable
+
 
 # --------------------------------------------------
 # PAYMENT CAPTURE FEATURE FLAG
@@ -346,4 +350,222 @@ def read_customer_history(
         raise HTTPException(
             status_code=422,
             detail=str(exc),
+        ) from None
+
+# --------------------------------------------------
+# INTENTRA - UNIFIED PERSONAL PAYMENT ADVICE
+# --------------------------------------------------
+
+class PersonalPaymentAdviceRequest(BaseModel):
+    transaction_type: str
+    amount: float = Field(
+        ...,
+        gt=0,
+        allow_inf_nan=False,
+    )
+    starting_balance: float = Field(
+        ...,
+        ge=0,
+        allow_inf_nan=False,
+    )
+    merchant_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+    )
+
+
+@app.post("/advisor/analyze")
+def analyze_personal_payment(
+    request: PersonalPaymentAdviceRequest,
+):
+    """
+    Generate structured evidence for a fictional
+    consumer demo account.
+
+    Account identity and historical cutoff are
+    owned by the server, not supplied by the client.
+
+    This endpoint does not create, authorize,
+    block, or capture any payment.
+    """
+
+    demo_customer_id = 0
+
+    # The IBM synthetic dataset represents
+    # historical activity before this demo date.
+    history_cutoff = "2025-01-01T00:00"
+
+    try:
+        # ------------------------------------
+        # 1. ACCOUNT-SPECIFIC BEHAVIOR
+        # ------------------------------------
+
+        behavior = analyze_customer_behavior(
+            customer_id=demo_customer_id,
+            amount=request.amount,
+            merchant_id=request.merchant_id,
+            transaction_time=history_cutoff,
+        )
+
+        # ------------------------------------
+        # 2. EXPERIMENTAL MODEL SCREENING
+        # ------------------------------------
+
+        prediction = None
+        model_available = True
+
+        try:
+            prediction = predict_transaction(
+                transaction_type=(
+                    request.transaction_type.strip().upper()
+                ),
+                amount=request.amount,
+                old_balance=request.starting_balance,
+            )
+        except RuntimeError:
+            # The advice engine can still report
+            # funding and behavioral findings.
+            model_available = False
+
+        # ------------------------------------
+        # 3. STRUCTURED PAYMENT ADVICE
+        # ------------------------------------
+
+        advice = create_payment_advice(
+            transaction_type=request.transaction_type,
+            amount=request.amount,
+            starting_balance=request.starting_balance,
+            merchant_id=request.merchant_id,
+            prediction=prediction,
+            behavior=behavior,
+        )
+
+        return {
+            "demo_account": {
+                "display_name": "Alex Morgan",
+                "synthetic": True,
+            },
+            "advice": advice,
+            "evidence": {
+                "behavior": behavior,
+                "model": prediction,
+                "model_available": model_available,
+            },
+            "payment_action_taken": False,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from None
+
+# --------------------------------------------------
+# INTENTRA - CONVERSATIONAL AI ADVISOR
+# --------------------------------------------------
+
+class AdvisorConversationMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+    )
+
+
+class AdvisorChatRequest(BaseModel):
+    transaction_type: str
+    amount: float = Field(
+        ...,
+        gt=0,
+        allow_inf_nan=False,
+    )
+    starting_balance: float = Field(
+        ...,
+        ge=0,
+        allow_inf_nan=False,
+    )
+    merchant_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+    )
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+    )
+    conversation: list[AdvisorConversationMessage] = Field(
+        default_factory=list,
+        max_length=12,
+    )
+
+
+@app.post("/advisor/chat")
+def chat_with_intentra(request: AdvisorChatRequest):
+    """
+    Answer a user question using freshly computed,
+    server-controlled synthetic demo evidence.
+
+    The LLM is never given payment execution tools.
+    """
+
+    try:
+        payment_request = PersonalPaymentAdviceRequest(
+            transaction_type=request.transaction_type,
+            amount=request.amount,
+            starting_balance=request.starting_balance,
+            merchant_id=request.merchant_id,
+        )
+
+        assessment = analyze_personal_payment(
+            payment_request
+        )
+
+        # Send the interpreted evidence, not raw
+        # transaction records or arbitrary client
+        # claims about model results.
+        grounded_evidence = {
+            "demo_account": assessment["demo_account"],
+            "advice": assessment["advice"],
+            "behavior_signals": assessment["evidence"][
+                "behavior"
+            ].get("signals", []),
+            "model_available": assessment["evidence"][
+                "model_available"
+            ],
+        }
+
+        response = generate_ai_reply(
+            message=request.message,
+            evidence=grounded_evidence,
+            conversation=[
+                item.model_dump()
+                for item in request.conversation
+            ],
+        )
+
+        return {
+            **response,
+            "assessment_status": assessment["advice"][
+                "status"
+            ],
+            "synthetic_demo": True,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from None
+
+    except AIAdvisorUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Conversational AI is temporarily "
+                "unavailable. The payment analysis "
+                "remains accessible."
+            ),
         ) from None

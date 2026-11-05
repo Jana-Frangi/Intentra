@@ -192,6 +192,13 @@ export default function IntentraChat() {
     setError("");
     setLastModel("");
   }
+  
+  function resetPaymentConversation() {
+    setMessages([]);
+    setQuestion("");
+    setError("");
+    setLastModel("");
+  }
 
   return (
     <section style={panelStyle}>
@@ -274,9 +281,10 @@ export default function IntentraChat() {
 
           <select
             value={transactionType}
-            onChange={(event) =>
-              setTransactionType(event.target.value)
-            }
+            onChange={(event) => {
+                setTransactionType(event.target.value);
+                resetPaymentConversation();
+            }}
             disabled={sending}
             style={inputStyle}
           >
@@ -299,9 +307,10 @@ export default function IntentraChat() {
             step="0.01"
             value={amount}
             disabled={sending}
-            onChange={(event) =>
-              setAmount(event.target.value)
-            }
+            onChange={(event) => {
+                setAmount(event.target.value);
+                resetPaymentConversation();
+                }}
             style={inputStyle}
           />
         </div>
@@ -317,9 +326,10 @@ export default function IntentraChat() {
             step="0.01"
             value={balance}
             disabled={sending}
-            onChange={(event) =>
-              setBalance(event.target.value)
-            }
+            onChange={(event) => {
+                setBalance(event.target.value);
+                resetPaymentConversation();
+            }}
             style={inputStyle}
           />
         </div>
@@ -334,9 +344,10 @@ export default function IntentraChat() {
             maxLength={200}
             value={merchant}
             disabled={sending}
-            onChange={(event) =>
-              setMerchant(event.target.value)
-            }
+            onChange={(event) => {
+                setMerchant(event.target.value);
+                resetPaymentConversation();
+                }}
             style={inputStyle}
           />
         </div>

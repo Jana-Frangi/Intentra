@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { useDemoCustomer, DEMO_CUSTOMER_NAMES, demoCustomerInitials } from './demoCustomer'
 
 type AccountSummary = {
   customer_id: number
@@ -16,7 +17,6 @@ type Props = {
   onOpenProtection: () => void
 }
 
-const DEMO_ACCOUNT_ID = 0
 
 const cardStyle: CSSProperties = {
   padding: 22,
@@ -44,6 +44,10 @@ function formatAmount(value: number | null) {
 export default function PersonalOverview({
   onOpenProtection,
 }: Props) {
+
+  const [customerId] = useDemoCustomer()
+  const customerName = DEMO_CUSTOMER_NAMES[customerId]
+  const firstName = customerName.split(' ')[0]
   const [summary, setSummary] =
     useState<AccountSummary | null>(null)
 
@@ -59,7 +63,9 @@ export default function PersonalOverview({
 
       try {
         const response = await fetch(
-          `/api/history/customer/${DEMO_ACCOUNT_ID}?limit=5`,
+
+          `/api/history/customer/${customerId}?limit=5`,
+
           {
             signal: controller.signal,
             cache: 'no-store',
@@ -74,7 +80,8 @@ export default function PersonalOverview({
           await response.json()
 
         if (
-          result.customer_id !== DEMO_ACCOUNT_ID ||
+
+          result.customer_id !== customerId ||
           result.synthetic_data !== true ||
           !Number.isFinite(
             result.total_historical_transactions
@@ -100,37 +107,39 @@ export default function PersonalOverview({
     void loadSummary()
 
     return () => controller.abort()
-  }, [])
+  }, [customerId])
 
-  const stats = summary
+
+  const activeSummary = summary?.customer_id === customerId ? summary : null
+  const stats = activeSummary
     ? [
         {
           label: 'Historical transactions',
           value:
-            summary.total_historical_transactions
+            activeSummary.total_historical_transactions
               .toLocaleString('en-US'),
           detail: 'Recorded synthetic activity',
         },
         {
           label: 'Typical recent amount',
           value: formatAmount(
-            summary.median_recent_amount
+            activeSummary.median_recent_amount
           ),
           detail: `Median of ${
-            summary.recent_sample_size
+            activeSummary.recent_sample_size
           } recent transactions`,
         },
         {
           label: 'Average recent amount',
           value: formatAmount(
-            summary.average_recent_amount
+            activeSummary.average_recent_amount
           ),
           detail: 'Absolute amount average',
         },
         {
           label: 'Recent merchants',
           value:
-            summary.unique_recent_merchants
+            activeSummary.unique_recent_merchants
               .toLocaleString('en-US'),
           detail: 'Distinct merchants in recent history',
         },
@@ -171,7 +180,7 @@ export default function PersonalOverview({
               color: '#172344',
             }}
           >
-            Welcome back, Alex ✦
+            Welcome back, {firstName} ✦
           </h2>
 
           <p style={muted}>
@@ -204,7 +213,7 @@ export default function PersonalOverview({
               fontSize: 14,
             }}
           >
-            AM
+            {demoCustomerInitials(customerId)}
           </div>
 
           <div>
@@ -215,7 +224,7 @@ export default function PersonalOverview({
                 color: '#172344',
               }}
             >
-              Alex Morgan
+              {customerName}
             </strong>
 
             <span
@@ -254,7 +263,7 @@ export default function PersonalOverview({
         </div>
       )}
 
-      {summary && (
+      {activeSummary && (
         <div
           style={{
             display: 'grid',
@@ -355,7 +364,7 @@ export default function PersonalOverview({
           margin: '17px 0 0',
         }}
       >
-        Alex Morgan is a fictional profile using IBM
+        {customerName} is a fictional profile using IBM
         TabFormer synthetic records. Statistics are
         retrieved from the demo API. These are not
         actual PayPal account transactions.

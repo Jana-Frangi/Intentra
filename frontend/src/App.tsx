@@ -9,6 +9,12 @@ import GuidedPaymentJourney from './GuidedPaymentJourney'
 import DemoWelcome from './DemoWelcome'
 import PersonalOverview from './PersonalOverview'
 import IntentraChat from "./IntentraChat";
+import {
+  useDemoCustomer,
+  DEMO_CUSTOMER_NAMES,
+  DEMO_CUSTOMERS,
+} from './demoCustomer'
+
 
 type View = 'overview' | 'protection' | 'checkout' | 'analyst'
 
@@ -41,6 +47,17 @@ const navigation: {
 ]
 
 function App() {
+
+  const [customerId, setCustomerId] = useDemoCustomer()
+
+  const customerName = DEMO_CUSTOMER_NAMES[customerId]
+
+  const customerInitials = customerName
+   .split(' ')
+   .map((word) => word[0])
+   .join('')
+   .slice(0, 2)
+
   const [demoActive, setDemoActive] = useState(false)
   // ------------------------------------------
   // DASHBOARD NAVIGATION
@@ -333,7 +350,56 @@ function App() {
   Exit demo
 </button>
 
-<span className="demo-avatar">AM</span>
+
+<div
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  }}
+>
+  <label
+    htmlFor="demo-customer-select"
+    style={{
+      fontSize: 12,
+      color: '#66748d',
+      fontWeight: 600,
+    }}
+  >
+    Demo account
+  </label>
+
+  <select
+    id="demo-customer-select"
+    value={customerId}
+    onChange={(event) =>
+      setCustomerId(Number(event.target.value))
+    }
+    aria-label="Select fictional demo customer"
+    style={{
+      padding: '9px 12px',
+      background: '#ffffff',
+      color: '#243354',
+      border: '1px solid #dfe5fa',
+      borderRadius: 10,
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: 'pointer',
+      maxWidth: 190,
+    }}
+  >
+      {DEMO_CUSTOMERS.map((id) => (
+        <option key={id} value={id}>
+          {DEMO_CUSTOMER_NAMES[id]}
+        </option>
+      ))}
+    </select>
+
+    <span className="demo-avatar">
+      {customerInitials}
+    </span>
+  </div>
+
           </div>
         </header>
 
@@ -352,6 +418,7 @@ function App() {
             }}
           >
             <PersonalOverview
+  key={customerId}
   onOpenProtection={() => navigateTo('protection')}
 />
             <section className="dashboard-hero">
@@ -498,7 +565,7 @@ function App() {
 
                   <h2>Choose your next action</h2>
                 </div>
-                
+
               </div>
 
               <div className="capability-grid">
@@ -612,10 +679,36 @@ function App() {
 
               <div className="workspace-card protect-card">
                 <AIRiskPanel
+  key={customerId}
   onOpenCheckout={() => navigateTo('checkout')}
 />
-                <CustomerHistoryPanel />
-                <IntentraChat />
+
+<details
+  style={{
+    margin: '20px 0',
+    border: '1px solid #dfe5fa',
+    borderRadius: 14,
+    background: '#f6f8ff',
+    padding: '16px 20px',
+  }}
+>
+  <summary
+    style={{
+      cursor: 'pointer',
+      fontSize: 15,
+      fontWeight: 700,
+      color: '#243354',
+    }}
+  >
+    Transaction History — Show / Hide
+  </summary>
+
+  <div style={{ marginTop: 16 }}>
+    <CustomerHistoryPanel key={customerId} />
+  </div>
+</details>
+
+                <IntentraChat key={customerId} />
               </div>
             </section>
           </div>

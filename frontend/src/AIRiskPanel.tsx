@@ -1,7 +1,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { useDemoCustomer } from './demoCustomer'
+import { useDemoCustomer, DEMO_CUSTOMER_NAMES, demoCustomerInitials } from './demoCustomer'
 import { usePaymentContext } from './paymentContext'
 
 type Prediction = {
@@ -36,7 +36,7 @@ type Props = {
   onOpenCheckout?: () => void
 }
 
-const DEMO_ACCOUNT_ID = 0
+
 const DEMO_TIMESTAMP = '2025-01-01T00:00'
 
 async function postJSON<T>(
@@ -118,10 +118,10 @@ const actionButton: CSSProperties = {
 export default function AIRiskPanel({
   onOpenCheckout,
 }: Props) {
-  const [sharedCustomerId, setSharedCustomerId] =
-    useDemoCustomer()
+  const [sharedCustomerId] = useDemoCustomer()
+  const customerName = DEMO_CUSTOMER_NAMES[sharedCustomerId]
 
- 
+
   const {
     transactionType,
     setTransactionType,
@@ -151,13 +151,6 @@ export default function AIRiskPanel({
   const requestGeneration = useRef(0)
   const precautionsRef = useRef<HTMLDivElement>(null)
 
-  // The consumer demo always opens Alex's account.
-  // Both panels still share the same underlying ID.
-  useEffect(() => {
-    setSharedCustomerId(DEMO_ACCOUNT_ID)
-  }, [setSharedCustomerId])
-  
-
   function clearResults() {
     requestGeneration.current += 1
     setPrediction(null)
@@ -183,11 +176,6 @@ export default function AIRiskPanel({
     const currentRequest = requestGeneration.current
     const numericAmount = Number(amount)
     const numericBalance = Number(balance)
-
-    if (sharedCustomerId !== DEMO_ACCOUNT_ID) {
-      setError('The demo account is being prepared.')
-      return
-    }
 
     if (
       amount.trim() === '' ||
@@ -217,7 +205,7 @@ export default function AIRiskPanel({
         postJSON<BehaviorResult>(
           '/api/behavior/analyze-history',
           {
-            customer_id: DEMO_ACCOUNT_ID,
+            customer_id: sharedCustomerId,
             amount: numericAmount,
             merchant_id: merchantId.trim(),
             transaction_time: DEMO_TIMESTAMP,
@@ -248,7 +236,7 @@ export default function AIRiskPanel({
       if (
         historyResult.status === 'fulfilled' &&
         historyResult.value.customer_id ===
-          DEMO_ACCOUNT_ID &&
+            sharedCustomerId &&
         typeof historyResult.value.status === 'string' &&
         Array.isArray(
           historyResult.value.signals ?? []
@@ -389,7 +377,7 @@ export default function AIRiskPanel({
                 fontSize: 16,
               }}
             >
-              AM
+              {demoCustomerInitials(sharedCustomerId)}
             </div>
 
             <div>
@@ -401,7 +389,7 @@ export default function AIRiskPanel({
                   marginBottom: 4,
                 }}
               >
-                Alex Morgan
+                {customerName}
               </strong>
 
               <span
@@ -494,18 +482,17 @@ export default function AIRiskPanel({
               />
             </label>
 
+
             <button
               type="button"
               onClick={analyze}
-              disabled={
-                loading ||
-                sharedCustomerId !== DEMO_ACCOUNT_ID
-              }
+              disabled={loading}
               style={{
                 width: '100%',
                 marginTop: 6,
               }}
             >
+
               {loading
                 ? 'Reviewing payment...'
                 : 'Review payment safety'}
@@ -544,7 +531,7 @@ export default function AIRiskPanel({
                 margin: '8px 0 0',
               }}
             >
-              Alex is a fictional identity linked to
+              {customerName} is a fictional identity linked to
               existing synthetic IBM transactions.
               AI screening uses a separate PaySim
               dataset. No real account information
@@ -625,7 +612,7 @@ export default function AIRiskPanel({
                   <p style={muted}>
                     {loading
                       ? 'Historical comparison in progress'
-                      : 'Ready to compare with Alex’s history'}
+                      : `Ready to compare with ${customerName}'s history`}
                   </p>
                 </div>
               </div>
@@ -699,7 +686,7 @@ export default function AIRiskPanel({
               </div>
 
               <p style={muted}>
-                Demo units · Alex Morgan
+                Demo units · {customerName}
               </p>
 
               <p
@@ -810,7 +797,7 @@ export default function AIRiskPanel({
                       Compared with{' '}
                       {behavior.history_count} recent
                       synthetic transactions from
-                      Alex's account.
+                      {customerName}'s account.
                     </p>
 
                     {behavior.median_previous_amount !==
@@ -991,6 +978,129 @@ export default function AIRiskPanel({
                   )}
                 </ul>
               </div>
+
+
+{/* EXPLAINABLE PAYMENT EVIDENCE */}
+<details
+  style={{
+    marginTop: 22,
+    marginBottom: 20,
+    padding: '18px 20px',
+    background: '#eef2ff',
+    border: '1px solid #cdd8ff',
+    borderRadius: 14,
+  }}
+>
+  <summary
+    style={{
+      cursor: 'pointer',
+      color: '#253b87',
+      fontSize: 15,
+      fontWeight: 700,
+    }}
+  >
+    ✦ Why this advice? — See the numbers
+  </summary>
+
+  <div
+    style={{
+      marginTop: 18,
+      display: 'grid',
+      gap: 12,
+      color: '#283858',
+      fontSize: 13,
+    }}
+  >
+    <div>
+      <strong>Proposed payment</strong>
+      <div>
+        {formatAmount(analyzedAmount)} demo units
+      </div>
+    </div>
+
+    <div>
+      <strong>Entered starting balance</strong>
+      <div>
+        {formatAmount(Number(balance))} demo units
+      </div>
+    </div>
+
+    {analyzedAmount > Number(balance) && (
+      <div>
+        <strong>Amount not covered by this balance</strong>
+        <div>
+          {formatAmount(
+            analyzedAmount - Number(balance)
+          )} demo units
+        </div>
+      </div>
+    )}
+
+    {behavior &&
+      typeof behavior.median_previous_amount ===
+        'number' && (
+        <div>
+          <strong>Typical recent transaction</strong>
+          <div>
+            {formatAmount(
+              behavior.median_previous_amount
+            )} demo units (median)
+          </div>
+        </div>
+      )}
+
+    {behavior &&
+      typeof behavior.amount_to_median_ratio ===
+        'number' && (
+        <div>
+          <strong>Compared with usual spending</strong>
+          <div>
+            {behavior.amount_to_median_ratio.toFixed(1)}
+            × the recent median
+          </div>
+        </div>
+      )}
+
+    <div>
+      <strong>Merchant familiarity</strong>
+      <div>
+        {behavior?.merchant_seen_in_recent_history ===
+        true
+          ? 'Seen in recent synthetic history'
+          : behavior?.merchant_seen_in_recent_history ===
+            false
+            ? 'Not seen in recent synthetic history'
+            : 'Information unavailable'}
+      </div>
+    </div>
+
+    <div>
+      <strong>Experimental ML screening</strong>
+      <div>
+        {prediction
+          ? prediction.flagged_for_review
+            ? 'Flagged for review'
+            : 'No model alert'
+          : 'Unavailable'}
+      </div>
+    </div>
+
+    <p
+      style={{
+        margin: '8px 0 0',
+        color: '#65728e',
+        fontSize: 11,
+        lineHeight: 1.7,
+      }}
+    >
+      Figures come from the current payment inputs
+      and Intentra's structured backend results.
+      Historical amounts use synthetic demo units.
+      The experimental model does not establish
+      whether a payment is safe or fraudulent.
+    </p>
+  </div>
+</details>
 
               {/* ANALYST DETAILS */}
 

@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { usePaymentContext } from "./paymentContext";
+import { useDemoCustomer, DEMO_CUSTOMER_NAMES } from "./demoCustomer";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -35,13 +36,6 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  color: "#aebcda",
-  marginBottom: 7,
-};
-
 const primaryButton: React.CSSProperties = {
   padding: "12px 20px",
   background: "#6278f7",
@@ -53,16 +47,12 @@ const primaryButton: React.CSSProperties = {
 };
 
 export default function IntentraChat() {
- 
+  const [customerId] = useDemoCustomer();
   const {
     transactionType,
-    setTransactionType,
     amount,
-    setAmount,
     balance,
-    setBalance,
     merchantId: merchant,
-    setMerchantId: setMerchant,
   } = usePaymentContext();
 
 
@@ -75,139 +65,150 @@ export default function IntentraChat() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [lastModel, setLastModel] = useState("");
+  const requestGeneration = useRef(0);
+  const activeRequest = useRef<AbortController | null>(null);
 
-  async function sendMessage(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  // Invalidate pending requests before clearing a conversation.
+  function cancelPendingRequest() {
+    requestGeneration.current += 1;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setSending(false);
+  }
+
+  function clearConversation() {
+    setMessages([]);
+    setQuestion("");
+    setError("");
+    setLastModel("");
+  }
+
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const message = question.trim();
-
-    if (!message || sending) return;
+    if (!message || sending || activeRequest.current) return;
 
     const paymentAmount = Number(amount);
     const paymentBalance = Number(balance);
 
     if (
+      amount.trim() === "" ||
+      balance.trim() === "" ||
       !Number.isFinite(paymentAmount) ||
       paymentAmount <= 0 ||
       !Number.isFinite(paymentBalance) ||
       paymentBalance < 0
     ) {
-      setError(
-        "Enter a positive amount and a nonnegative balance."
-      );
+      setError("Enter a positive amount and a nonnegative balance.");
       return;
     }
 
     if (!merchant.trim()) {
-      setError(
-        "Enter a recipient or merchant identifier."
-      );
+      setError("Enter a recipient or merchant identifier.");
       return;
     }
 
     const previousMessages = messages.slice(-12);
+    const controller = new AbortController();
+    const currentRequest = ++requestGeneration.current;
+    activeRequest.current = controller;
 
     setError("");
     setSending(true);
     setQuestion("");
 
     try {
-      const response = await fetch(
-        "/api/advisor/chat",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            transaction_type: transactionType,
-            amount: paymentAmount,
-            starting_balance: paymentBalance,
-            merchant_id: merchant.trim(),
-            message,
-            conversation: previousMessages,
-          }),
-        }
-      );
+      const response = await fetch("/api/advisor/chat", {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: customerId,
+          transaction_type: transactionType,
+          amount: paymentAmount,
+          starting_balance: paymentBalance,
+          merchant_id: merchant.trim(),
+          message,
+          conversation: previousMessages,
+        }),
+      });
+
+      // Ignore responses from an earlier customer or payment context.
+      if (controller.signal.aborted ||
+          currentRequest !== requestGeneration.current) return;
 
       if (!response.ok) {
         let detail = "";
-
         try {
           const failure = await response.json();
-
           if (typeof failure.detail === "string") {
             detail = failure.detail;
           }
         } catch {
-          // Use a safe generic error below.
+          // Fall back to a generic error message.
         }
-
         throw new Error(
-          detail ||
-            `The advisor could not respond (HTTP ${response.status}).`
+          detail || `The advisor could not respond (HTTP ${response.status}).`
         );
       }
 
-      const data: AdvisorResponse =
-        await response.json();
+      const data: AdvisorResponse = await response.json();
+      if (controller.signal.aborted ||
+          currentRequest !== requestGeneration.current) return;
 
-      if (
-        !data.generated ||
-        typeof data.reply !== "string" ||
-        !data.reply.trim()
-      ) {
-        throw new Error(
-          "The AI service returned an invalid response."
-        );
+      if (!data.generated ||
+          typeof data.reply !== "string" ||
+          !data.reply.trim()) {
+        throw new Error("The AI service returned an invalid response.");
       }
 
       setMessages((current) => [
-     ...current,
-    { role: "user", content: message },
-    { role: "assistant", content: data.reply },
-    ]);
-
+        ...current,
+        { role: "user", content: message },
+        { role: "assistant", content: data.reply },
+      ]);
       setLastModel(data.model || "AI model");
     } catch (caught) {
-      const messageText =
-        caught instanceof Error
-          ? caught.message
-          : "An unexpected error occurred.";
+      if (controller.signal.aborted ||
+          currentRequest !== requestGeneration.current) return;
 
+      const messageText = caught instanceof Error
+        ? caught.message
+        : "An unexpected error occurred.";
       setError(messageText);
-
-      // Restore the question so the user
-      // can retry without retyping.
+      // Restore the unsent question so it can be retried.
       setQuestion(message);
     } finally {
-      setSending(false);
+      if (currentRequest === requestGeneration.current) {
+        activeRequest.current = null;
+        setSending(false);
+      }
     }
   }
 
   function startNewConversation() {
-    if (sending) return;
-
-    setMessages([]);
-    setQuestion("");
-    setError("");
-    setLastModel("");
+    cancelPendingRequest();
+    clearConversation();
   }
-    useEffect(() => {
-    setMessages([]);
-    setQuestion("");
-    setError("");
-    setLastModel("");
-    }, [transactionType, amount, balance, merchant]);
 
-  function resetPaymentConversation() {
+  useEffect(() => {
+    // Customer/payment changes invalidate all prior conversation context.
+    requestGeneration.current += 1;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setSending(false);
     setMessages([]);
     setQuestion("");
     setError("");
     setLastModel("");
-  }
+
+    return () => {
+      requestGeneration.current += 1;
+      activeRequest.current?.abort();
+      activeRequest.current = null;
+    };
+  }, [customerId, transactionType, amount, balance, merchant]);
 
   return (
     <section style={panelStyle}>
@@ -247,12 +248,10 @@ export default function IntentraChat() {
         <button
           type="button"
           onClick={startNewConversation}
-          disabled={sending}
           style={{
             ...primaryButton,
             background: "#263653",
             fontSize: 12,
-            opacity: sending ? 0.5 : 1,
           }}
         >
           New conversation
@@ -274,94 +273,45 @@ export default function IntentraChat() {
       </p>
 
       <div
+        aria-label="Current payment details"
         style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(145px, 1fr))",
-          gap: 12,
-          marginTop: 20,
+          background: "#172641",
+          border: "1px solid #394966",
+          borderRadius: 12,
+          padding: "13px 16px",
+          marginTop: 16,
           marginBottom: 20,
+          fontSize: 13,
+          lineHeight: 1.7,
+          color: "#d4def5",
         }}
       >
-        <div>
-          <label style={labelStyle}>
-            Transaction type
-          </label>
-
-          <select
-            value={transactionType}
-            onChange={(event) => {
-                setTransactionType(event.target.value);
-                resetPaymentConversation();
-            }}
-            disabled={sending}
-            style={inputStyle}
-          >
-            <option value="TRANSFER">Transfer</option>
-            <option value="PAYMENT">Payment</option>
-            <option value="DEBIT">Debit</option>
-            <option value="CASH_OUT">Cash out</option>
-            <option value="CASH_IN">Cash in</option>
-          </select>
+        <div
+          style={{
+            fontSize: 11,
+            color: "#96aaff",
+            fontWeight: 700,
+            marginBottom: 5,
+          }}
+        >
+          CURRENT PAYMENT · DEMO UNITS
         </div>
-
-        <div>
-          <label style={labelStyle}>
-            Amount (demo units)
-          </label>
-
-          <input
-            type="text"
-            inputMode="decimal"
-            min="0.01"
-            step="0.01"
-            value={amount}
-            disabled={sending}
-            onChange={(event) => {
-                setAmount(event.target.value);
-                resetPaymentConversation();
-                }}
-            style={inputStyle}
-          />
+        <strong>{transactionType}</strong>
+        {" · "}
+        {amount || "—"} demo units
+        {" · "}
+        Starting balance: {balance || "—"} demo units
+        <div style={{ color: "#aebcda" }}>
+          Recipient: {merchant || "Not specified"}
         </div>
-
-        <div>
-          <label style={labelStyle}>
-            Starting balance
-          </label>
-
-          <input
-            type="text"
-inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={balance}
-            disabled={sending}
-            onChange={(event) => {
-                setBalance(event.target.value);
-                resetPaymentConversation();
-            }}
-            style={inputStyle}
-          />
-        </div>
-
-        <div>
-          <label style={labelStyle}>
-            Merchant / recipient ID
-          </label>
-
-          <input
-            type="text"
-            inputMode="decimal"
-            maxLength={200}
-            value={merchant}
-            disabled={sending}
-            onChange={(event) => {
-                setMerchant(event.target.value);
-                resetPaymentConversation();
-                }}
-            style={inputStyle}
-          />
+        <div
+          style={{
+            fontSize: 11,
+            color: "#96aaff",
+            marginTop: 5,
+          }}
+        >
+          To change these details, use the Payment Protection form above.
         </div>
       </div>
 
@@ -400,7 +350,7 @@ inputMode="decimal"
             <strong
               style={{ color: "#ffffff" }}
             >
-              Welcome to Intentra, Alex.
+              Welcome to Intentra, {DEMO_CUSTOMER_NAMES[customerId]}.
             </strong>
 
             <p>

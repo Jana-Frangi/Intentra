@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { useDemoCustomer, DEMO_CUSTOMER_NAMES, demoCustomerInitials } from './demoCustomer'
 
 type Transaction = {
   id: number
@@ -26,7 +27,7 @@ type CustomerHistory = {
   note: string
 }
 
-const DEMO_CUSTOMER_ID = 0
+
 
 function formatAmount(amount: number) {
   return amount.toLocaleString('en-US', {
@@ -50,6 +51,8 @@ const mutedText: CSSProperties = {
 }
 
 export default function CustomerHistoryPanel() {
+  const [customerId] = useDemoCustomer()
+  const customerName = DEMO_CUSTOMER_NAMES[customerId]
   const [history, setHistory] =
     useState<CustomerHistory | null>(null)
 
@@ -66,7 +69,7 @@ export default function CustomerHistoryPanel() {
 
       try {
         const response = await fetch(
-          `/api/history/customer/${DEMO_CUSTOMER_ID}?limit=20`,
+          `/api/history/customer/${customerId}?limit=20`,
           {
             signal: controller.signal,
             cache: 'no-store',
@@ -83,7 +86,7 @@ export default function CustomerHistoryPanel() {
           await response.json()
 
         if (
-          result.customer_id !== DEMO_CUSTOMER_ID ||
+          result.customer_id !== customerId ||
           result.synthetic_data !== true ||
           !Array.isArray(result.transactions)
         ) {
@@ -110,10 +113,13 @@ export default function CustomerHistoryPanel() {
 
     void loadHistory()
 
-    return () => controller.abort()
-  }, [])
 
-  const transactions = history?.transactions ?? []
+    return () => controller.abort()
+  }, [customerId])
+
+
+  const activeHistory = history?.customer_id === customerId ? history : null
+  const transactions = activeHistory?.transactions ?? []
 
   const chartTransactions = transactions
     .slice(0, 10)
@@ -126,37 +132,37 @@ export default function CustomerHistoryPanel() {
     )
   )
 
-  const summary = history
+  const summary = activeHistory
     ? [
         {
           label: 'Historical transactions',
           value:
-            history.total_historical_transactions.toLocaleString(
+            activeHistory.total_historical_transactions.toLocaleString(
               'en-US'
             ),
         },
         {
           label: 'Typical recent amount',
           value:
-            history.median_recent_amount === null
+            activeHistory.median_recent_amount === null
               ? 'N/A'
               : formatAmount(
-                  history.median_recent_amount
+                  activeHistory.median_recent_amount
                 ),
         },
         {
           label: 'Average recent amount',
           value:
-            history.average_recent_amount === null
+            activeHistory.average_recent_amount === null
               ? 'N/A'
               : formatAmount(
-                  history.average_recent_amount
+                  activeHistory.average_recent_amount
                 ),
         },
         {
           label: 'Recent merchants',
           value:
-            history.unique_recent_merchants.toLocaleString(
+            activeHistory.unique_recent_merchants.toLocaleString(
               'en-US'
             ),
         },
@@ -196,7 +202,7 @@ export default function CustomerHistoryPanel() {
           </h2>
 
           <p style={mutedText}>
-            Explore Alex Morgan's existing synthetic
+            Explore {customerName}'s existing synthetic
             transaction history and spending patterns.
           </p>
         </div>
@@ -226,7 +232,7 @@ export default function CustomerHistoryPanel() {
               fontWeight: 800,
             }}
           >
-            AM
+            {demoCustomerInitials(customerId)}
           </div>
 
           <div>
@@ -237,7 +243,7 @@ export default function CustomerHistoryPanel() {
                 fontSize: 13,
               }}
             >
-              Alex Morgan
+              {customerName}
             </strong>
 
             <span
@@ -264,7 +270,7 @@ export default function CustomerHistoryPanel() {
         </p>
       )}
 
-      {history && (
+      {activeHistory && (
         <>
           {/* PERSONAL STATISTICS */}
 
@@ -329,7 +335,7 @@ export default function CustomerHistoryPanel() {
                 role="img"
                 aria-label={
                   'Chart of the absolute amounts of ' +
-                  'Alex Morgan’s ten latest synthetic transactions'
+                  `${customerName}'s ten latest synthetic transactions`
                 }
                 style={{
                   display: 'flex',
@@ -528,11 +534,11 @@ export default function CustomerHistoryPanel() {
               marginTop: 18,
             }}
           >
-            {history.note} Summary statistics use the
-            most recent {history.recent_sample_size}{' '}
+            {activeHistory.note} Summary statistics use the
+            most recent {activeHistory.recent_sample_size}{' '}
             transactions, rather than the full history.
             Amounts are in synthetic dataset units.
-            Alex Morgan is a fictional display identity,
+            {customerName} is a fictional display identity,
             not a real customer. This history is separate
             from the PaySim ML model and PayPal Sandbox.
           </p>

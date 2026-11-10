@@ -5,6 +5,13 @@ import { useSyncExternalStore } from 'react'
 // Both panels subscribe to the same customer ID.
 export const DEMO_CUSTOMERS = [0, 396, 486] as const
 
+export const DEMO_CUSTOMER_NAMES: Record<number, string> = {
+  0: 'Alex Morgan',
+  396: 'Demo Customer 396',
+  486: 'Demo Customer 486',
+}
+
+
 let selectedCustomer = 0
 
 const subscribers = new Set<() => void>()
@@ -46,4 +53,14 @@ export function useDemoCustomer(): [
   )
 
   return [customerId, setDemoCustomer]
+}
+
+// Keep account initials consistent across the dashboard and welcome screen.
+export function demoCustomerInitials(customerId: number): string {
+  return (DEMO_CUSTOMER_NAMES[customerId] ?? 'Demo Customer')
+    .split(' ')
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 }

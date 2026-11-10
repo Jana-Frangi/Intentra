@@ -1,5 +1,6 @@
 
 import type { CSSProperties } from 'react'
+import { useDemoCustomer, DEMO_CUSTOMERS, DEMO_CUSTOMER_NAMES, demoCustomerInitials } from './demoCustomer'
 
 type DemoWelcomeProps = {
   onEnter: () => void
@@ -32,6 +33,8 @@ const button: CSSProperties = {
 export default function DemoWelcome({
   onEnter,
 }: DemoWelcomeProps) {
+  const [customerId, setCustomerId] = useDemoCustomer()
+  const customerName = DEMO_CUSTOMER_NAMES[customerId]
   return (
     <div style={page}>
       <header
@@ -218,9 +221,22 @@ export default function DemoWelcome({
                 marginBottom: 17,
               }}
             >
-              EXISTING DEMO ACCOUNT
+              CHOOSE A FICTIONAL DEMO ACCOUNT
             </div>
 
+            <label htmlFor="welcome-demo-account" style={{ display: 'block', marginBottom: 13, fontSize: 12, fontWeight: 700, color: '#516079' }}>
+              Select demo account
+            </label>
+            <select
+              id="welcome-demo-account"
+              value={customerId}
+              onChange={(event) => setCustomerId(Number(event.target.value))}
+              style={{ width: '100%', padding: '12px 14px', marginBottom: 17, border: '1px solid #cbd6f5', borderRadius: 10, background: '#ffffff', color: '#172344', fontSize: 14, fontWeight: 600 }}
+            >
+              {DEMO_CUSTOMERS.map((id) => (
+                <option key={id} value={id}>{DEMO_CUSTOMER_NAMES[id]}</option>
+              ))}
+            </select>
             <div
               style={{
                 display: 'flex',
@@ -243,7 +259,7 @@ export default function DemoWelcome({
                   fontWeight: 800,
                 }}
               >
-                AM
+                {demoCustomerInitials(customerId)}
               </div>
 
               <div style={{ minWidth: 0 }}>
@@ -254,7 +270,7 @@ export default function DemoWelcome({
                     marginBottom: 4,
                   }}
                 >
-                  Alex Morgan
+                  {customerName}
                 </strong>
 
                 <span
@@ -274,7 +290,7 @@ export default function DemoWelcome({
             style={button}
             onClick={onEnter}
           >
-            Enter Alex's demo account →
+            Enter {customerName}'s demo account →
           </button>
 
           <p

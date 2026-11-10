@@ -378,6 +378,7 @@ def read_customer_history(
 # --------------------------------------------------
 
 class PersonalPaymentAdviceRequest(BaseModel):
+    customer_id: Literal[0, 396, 486] = 0
     transaction_type: str
     amount: float = Field(
         ...,
@@ -411,7 +412,13 @@ def analyze_personal_payment(
     block, or capture any payment.
     """
 
-    demo_customer_id = 0
+    demo_customer_id = request.customer_id
+
+    demo_customer_names = {
+    0: "Alex Morgan",
+    396: "Demo Customer 396",
+    486: "Demo Customer 486",
+}
 
     # The IBM synthetic dataset represents
     # historical activity before this demo date.
@@ -464,8 +471,9 @@ def analyze_personal_payment(
 
         return {
             "demo_account": {
-                "display_name": "Alex Morgan",
-                "synthetic": True,
+            "customer_id": demo_customer_id,
+            "display_name": demo_customer_names[demo_customer_id],
+            "synthetic": True,
             },
             "advice": advice,
             "evidence": {
@@ -496,6 +504,7 @@ class AdvisorConversationMessage(BaseModel):
 
 
 class AdvisorChatRequest(BaseModel):
+    customer_id: Literal[0, 396, 486] = 0
     transaction_type: str
     amount: float = Field(
         ...,
@@ -534,6 +543,7 @@ def chat_with_intentra(request: AdvisorChatRequest):
 
     try:
         payment_request = PersonalPaymentAdviceRequest(
+            customer_id=request.customer_id,
             transaction_type=request.transaction_type,
             amount=request.amount,
             starting_balance=request.starting_balance,

@@ -1,16 +1,19 @@
-
+from contextlib import asynccontextmanager
 from decimal import Decimal, InvalidOperation
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from behavior_engine import analyze_behavior
 from risk_engine import analyze_transaction
 from paypal_client import create_sandbox_order
-from payment_store import save_order, get_order
+from payment_store import (
+    save_order,
+    get_order,
+    mark_interrupted_captures_for_reconciliation,
+)
 from checkout_sessions import (
     create_checkout_session,
     verify_checkout_session,
 )
-from payment_capture import process_sandbox_capture
 from payment_capture import process_sandbox_capture
 from ml_predictor import predict_transaction
 from behavioral_intelligence import analyze_customer_behavior
@@ -26,11 +29,29 @@ from ai_advisor import generate_ai_reply, AIAdvisorUnavailable
 
 CAPTURE_ENABLED = False
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Recover capture attempts interrupted by a restart.
+    # This does not send any payment requests to PayPal.
+    recovered_count = (
+        mark_interrupted_captures_for_reconciliation()
+    )
+
+    print(
+        "[Intentra] Interrupted payment captures "
+        f"marked for reconciliation: {recovered_count}"
+    )
+
+    yield
+
+
 app = FastAPI(
     title="Intentra API",
     description="Backend for the Intentra payment intelligence application",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
 
 
 # --------------------------------------------------

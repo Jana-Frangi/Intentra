@@ -1,5 +1,5 @@
-
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { usePaymentContext } from "./paymentContext";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -53,15 +53,18 @@ const primaryButton: React.CSSProperties = {
 };
 
 export default function IntentraChat() {
-  const [transactionType, setTransactionType] =
-    useState("DEBIT");
+ 
+  const {
+    transactionType,
+    setTransactionType,
+    amount,
+    setAmount,
+    balance,
+    setBalance,
+    merchantId: merchant,
+    setMerchantId: setMerchant,
+  } = usePaymentContext();
 
-  const [amount, setAmount] = useState("3000");
-  const [balance, setBalance] = useState("200");
-
-  const [merchant, setMerchant] = useState(
-    "DEMO_NEW_MERCHANT"
-  );
 
   const [question, setQuestion] = useState("");
 
@@ -192,7 +195,13 @@ export default function IntentraChat() {
     setError("");
     setLastModel("");
   }
-  
+    useEffect(() => {
+    setMessages([]);
+    setQuestion("");
+    setError("");
+    setLastModel("");
+    }, [transactionType, amount, balance, merchant]);
+
   function resetPaymentConversation() {
     setMessages([]);
     setQuestion("");
@@ -302,7 +311,8 @@ export default function IntentraChat() {
           </label>
 
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             min="0.01"
             step="0.01"
             value={amount}
@@ -321,7 +331,8 @@ export default function IntentraChat() {
           </label>
 
           <input
-            type="number"
+            type="text"
+inputMode="decimal"
             min="0"
             step="0.01"
             value={balance}
@@ -341,6 +352,7 @@ export default function IntentraChat() {
 
           <input
             type="text"
+            inputMode="decimal"
             maxLength={200}
             value={merchant}
             disabled={sending}

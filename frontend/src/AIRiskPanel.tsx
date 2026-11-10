@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useDemoCustomer } from './demoCustomer'
+import { usePaymentContext } from './paymentContext'
 
 type Prediction = {
   model_version: string
@@ -120,12 +121,18 @@ export default function AIRiskPanel({
   const [sharedCustomerId, setSharedCustomerId] =
     useDemoCustomer()
 
-  const [transactionType, setTransactionType] =
-    useState('TRANSFER')
-  const [amount, setAmount] = useState('1500')
-  const [balance, setBalance] = useState('1500')
-  const [merchantId, setMerchantId] =
-    useState('DEMO_NEW_MERCHANT')
+ 
+  const {
+    transactionType,
+    setTransactionType,
+    amount,
+    setAmount,
+    balance,
+    setBalance,
+    merchantId,
+    setMerchantId,
+  } = usePaymentContext()
+
 
   const [prediction, setPrediction] =
     useState<Prediction | null>(null)
@@ -149,6 +156,7 @@ export default function AIRiskPanel({
   useEffect(() => {
     setSharedCustomerId(DEMO_ACCOUNT_ID)
   }, [setSharedCustomerId])
+  
 
   function clearResults() {
     requestGeneration.current += 1
@@ -164,6 +172,10 @@ export default function AIRiskPanel({
   useEffect(() => {
     clearResults()
   }, [sharedCustomerId])
+
+  useEffect(() => {
+    clearResults()
+  }, [transactionType, amount, balance, merchantId])
 
   async function analyze() {
     clearResults()

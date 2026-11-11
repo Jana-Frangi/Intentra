@@ -50,6 +50,7 @@ export default function IntentraChat() {
   const [customerId] = useDemoCustomer();
   const {
     transactionType,
+    currency,
     amount,
     balance,
     merchantId: merchant,
@@ -303,6 +304,9 @@ export default function IntentraChat() {
         Starting balance: {balance || "—"} demo units
         <div style={{ color: "#aebcda" }}>
           Recipient: {merchant || "Not specified"}
+        </div>
+        <div style={{ color: "#aebcda" }}>
+          Preferred currency: {currency} (display preference only)
         </div>
         <div
           style={{

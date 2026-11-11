@@ -125,6 +125,8 @@ export default function AIRiskPanel({
   const {
     transactionType,
     setTransactionType,
+    currency,
+    setCurrency,
     amount,
     setAmount,
     balance,
@@ -168,7 +170,7 @@ export default function AIRiskPanel({
 
   useEffect(() => {
     clearResults()
-  }, [transactionType, amount, balance, merchantId])
+  }, [transactionType, currency, amount, balance, merchantId])
 
   async function analyze() {
     clearResults()
@@ -443,6 +445,53 @@ export default function AIRiskPanel({
             </label>
 
             <label>
+
+              Preferred currency
+
+              <select
+
+                value={currency}
+
+                onChange={(event) => {
+
+                  setCurrency(event.target.value)
+
+                  clearResults()
+
+                }}
+
+              >
+
+                <option value="EUR">EUR - Euro</option>
+
+                <option value="USD">USD - US Dollar</option>
+
+                <option value="GBP">GBP - British Pound</option>
+
+                <option value="AED">AED - UAE Dirham</option>
+
+                <option value="LBP">LBP - Lebanese Pound</option>
+
+              </select>
+
+            </label>
+
+
+
+            <p style={{ fontSize: 12, color: '#75819b', margin: 0 }}>
+
+              Currency preference only. Payment analysis and
+
+              historical comparisons use synthetic demo units.
+
+              No currency conversion is performed.
+
+            </p>
+
+
+
+            <label>
+
               Payment amount (demo units)
               <input
                 type="number"

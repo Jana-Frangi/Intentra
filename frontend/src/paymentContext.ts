@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 
 export type PaymentContext = {
   transactionType: string;
+  currency: string;
   amount: string;
   balance: string;
   merchantId: string;
@@ -10,6 +11,7 @@ export type PaymentContext = {
 
 let payment: PaymentContext = {
   transactionType: "TRANSFER",
+  currency: "EUR",
   amount: "1500",
   balance: "1500",
   merchantId: "DEMO_NEW_MERCHANT",
@@ -39,6 +41,7 @@ function updatePayment(
 
   const unchanged = (
     next.transactionType === payment.transactionType &&
+    next.currency === payment.currency &&
     next.amount === payment.amount &&
     next.balance === payment.balance &&
     next.merchantId === payment.merchantId
@@ -63,6 +66,12 @@ export function usePaymentContext() {
 
     setTransactionType: (value: string) =>
       updatePayment({ transactionType: value }),
+
+    setCurrency: (value: string) => {
+      const allowed = ["EUR", "USD", "GBP", "AED", "LBP"];
+      if (!allowed.includes(value)) return;
+      updatePayment({ currency: value });
+    },
 
     setAmount: (value: string) =>
       updatePayment({ amount: value }),

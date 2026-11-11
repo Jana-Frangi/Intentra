@@ -7,8 +7,8 @@ export const DEMO_CUSTOMERS = [0, 396, 486] as const
 
 export const DEMO_CUSTOMER_NAMES: Record<number, string> = {
   0: 'Alex Morgan',
-  396: 'Demo Customer 396',
-  486: 'Demo Customer 486',
+  396: 'Emma Wilson',
+  486: 'Daniel Carter',
 }
 
 

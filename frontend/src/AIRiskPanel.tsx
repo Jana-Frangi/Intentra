@@ -696,8 +696,12 @@ export default function AIRiskPanel({
                 }}
               >
                 {needsReview
-                  ? 'At least one experimental system ' +
-                    'identified a reason to review this payment.'
+                  ? prediction?.flagged_for_review
+                    ? 'Experimental ML screening flagged this payment. ' +
+                      'Your spending history is shown separately below.'
+                    : 'Your spending history identified unusual ' +
+                      'payment activity. Additional verification ' +
+                      'is recommended even without an ML alert.'
                   : fullyChecked
                     ? 'Neither completed system raised an ' +
                       'alert. This does not guarantee safety.'
@@ -737,7 +741,7 @@ export default function AIRiskPanel({
                   {prediction
                     ? prediction.flagged_for_review
                       ? 'Pattern flagged for review'
-                      : 'No model alert triggered'
+                      : 'No ML pattern flagged'
                     : 'Screening unavailable'}
                 </strong>
 
@@ -752,7 +756,9 @@ export default function AIRiskPanel({
                       ? 'The experimental PaySim model ' +
                         'flagged this transaction pattern.'
                       : 'The experimental PaySim model ' +
-                        'did not flag this pattern.'
+                        'did not independently flag this pattern. ' +
+                        'Behavioral checks may still recommend ' +
+                        'additional verification.'
                     : mlUnavailable
                       ? 'The AI screening service did not ' +
                         'return a usable result.'
@@ -1080,7 +1086,7 @@ export default function AIRiskPanel({
         {prediction
           ? prediction.flagged_for_review
             ? 'Flagged for review'
-            : 'No model alert'
+            : 'No ML pattern flagged'
           : 'Unavailable'}
       </div>
     </div>
